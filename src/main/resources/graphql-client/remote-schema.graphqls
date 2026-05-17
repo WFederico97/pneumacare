@@ -1,0 +1,15 @@
+# Remote service schema for DGS codegen.
+# Define types from external services that this microservice consumes.
+# Generated Java types will be placed in wfederico.backendjavacoretemplate.codegen
+
+type Query {
+    _placeholder: String
+}
+
+type RemoteTeam {
+    id: ID!
+    name: String!
+    city: String!
+    country: String!
+}
+

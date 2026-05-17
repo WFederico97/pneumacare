@@ -1,0 +1,22 @@
+INSERT INTO teams (name, city, country, created_at, updated_at) VALUES
+    ('River Plate',          'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Boca Juniors',         'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Racing Club',          'Avellaneda',     'AR', NOW(), NOW()),
+    ('Independiente',        'Avellaneda',     'AR', NOW(), NOW()),
+    ('San Lorenzo',          'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Vélez Sarsfield',      'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Estudiantes',          'La Plata',       'AR', NOW(), NOW()),
+    ('Gimnasia y Esgrima',   'La Plata',       'AR', NOW(), NOW()),
+    ('Newell''s Old Boys',   'Rosario',        'AR', NOW(), NOW()),
+    ('Rosario Central',      'Rosario',        'AR', NOW(), NOW()),
+    ('Talleres',             'Córdoba',        'AR', NOW(), NOW()),
+    ('Belgrano',             'Córdoba',        'AR', NOW(), NOW()),
+    ('Colón',                'Santa Fe',       'AR', NOW(), NOW()),
+    ('Unión',                'Santa Fe',       'AR', NOW(), NOW()),
+    ('Banfield',             'Banfield',       'AR', NOW(), NOW()),
+    ('Lanús',                'Lanús',          'AR', NOW(), NOW()),
+    ('Huracán',              'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Argentinos Juniors',   'Buenos Aires',   'AR', NOW(), NOW()),
+    ('Defensa y Justicia',   'Florencio Varela','AR', NOW(), NOW()),
+    ('Godoy Cruz',           'Mendoza',        'AR', NOW(), NOW());
+

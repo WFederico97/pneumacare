@@ -1,0 +1,45 @@
+type Query {
+    players(page: Int = 0, size: Int = 10, sortBy: String = "id", direction: String = "asc"): PlayerPage!
+    player(id: ID!): Player
+}
+
+type Mutation {
+    createPlayer(input: PlayerInput!): Player!
+    updatePlayer(id: ID!, input: PlayerInput!): Player!
+    patchPlayer(id: ID!, input: PlayerPatchInput!): Player!
+    deletePlayer(id: ID!): Boolean!
+}
+
+type Player {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    position: String!
+    alterPosition: String!
+    teamId: ID
+}
+
+input PlayerInput {
+    firstName: String!
+    lastName: String!
+    position: String!
+    alterPosition: String!
+    teamId: ID
+}
+
+input PlayerPatchInput {
+    firstName: String
+    lastName: String
+    position: String
+    alterPosition: String
+    teamId: ID
+}
+
+type PlayerPage {
+    content: [Player!]!
+    totalElements: Int!
+    totalPages: Int!
+    number: Int!
+    size: Int!
+}
+

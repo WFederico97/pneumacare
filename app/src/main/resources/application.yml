@@ -1,0 +1,91 @@
+spring:
+  application:
+    name: my-microservice   # TODO: rename per service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # Database
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mi_base_de_datos}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: false   # enabled per-profile (staging/prod)
+
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  # Kafka
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:localhost:9092}
+    consumer:
+      group-id: my-microservice-group
+      auto-offset-reset: earliest
+
+  # OAuth2 Resource Server
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9000}
+
+server:
+  port: ${APP_PORT:8080}
+
+# OpenAPI / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+# Actuator & Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        step: 10s
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+  tracing:
+    sampling:
+      probability: 1.0
+
+# Rate limiting
+app:
+  rate-limit:
+    threshold: ${RATE_LIMIT_THRESHOLD:10}
+    window-seconds: ${RATE_LIMIT_WINDOW:60}
+
+# Logging — traceId/spanId in MDC
+logging:
+  pattern:
+    correlation: '[${spring.application.name:},%mdc{traceId:-},%mdc{spanId:-}] '
+

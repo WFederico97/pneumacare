@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.3</version>
+        <relativePath/>
+    </parent>
+    <groupId>wfederico</groupId>
+    <artifactId>backend-java-core-template</artifactId>
+    <version>2.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>backend-java-core-template</name>
+    <description>Modular monolith backend template — Spring Boot 4, hexagonal architecture</description>
+    <url/>
+    <licenses><license/></licenses>
+    <developers><developer/></developers>
+    <scm><connection/><developerConnection/><tag/><url/></scm>
+
+    <!--
+        MODULE REGISTRY
+        ─────────────────────────────────────────────────────────────────
+        platform-core         : shared kernel (always required)
+        platform-security     : OAuth2 JWT + Redis rate-limiting  [toggle: app.modules.security.enabled]
+        platform-messaging    : Kafka producer/consumer infra      [toggle: app.modules.messaging.enabled]
+        platform-observability: OTEL traces + Micrometer metrics   [toggle: app.modules.observability.enabled]
+        module-player         : example bounded context
+        app                   : Spring Boot entry point
+        ─────────────────────────────────────────────────────────────────
+        To add a bounded context: copy module-player, rename packages/artifactId,
+        add the module here and as a dependency in app/pom.xml.
+    -->
+    <modules>
+        <module>platform-core</module>
+        <module>platform-security</module>
+        <module>platform-messaging</module>
+        <module>platform-observability</module>
+        <module>module-player</module>
+        <module>app</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
+        <modelmapper.version>3.2.0</modelmapper.version>
+        <springdoc.version>2.8.6</springdoc.version>
+        <graphqlcodegen.version>1.61.5</graphqlcodegen.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Internal modules -->
+            <dependency>
+                <groupId>wfederico</groupId>
+                <artifactId>platform-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>wfederico</groupId>
+                <artifactId>platform-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>wfederico</groupId>
+                <artifactId>platform-messaging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>wfederico</groupId>
+                <artifactId>platform-observability</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>wfederico</groupId>
+                <artifactId>module-player</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!-- Third-party BOM -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.modelmapper</groupId>
+                <artifactId>modelmapper</artifactId>
+                <version>${modelmapper.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Shared dependencies inherited by every module -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                            </path>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>io.github.deweyjose</groupId>
+                    <artifactId>graphqlcodegen-maven-plugin</artifactId>
+                    <version>${graphqlcodegen.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>

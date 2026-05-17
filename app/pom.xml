@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>wfederico</groupId>
+        <artifactId>backend-java-core-template</artifactId>
+        <version>2.0.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>app</artifactId>
+    <name>app</name>
+    <description>
+        Spring Boot entry point. Assembles all platform and domain modules.
+        This is the only executable artifact (spring-boot-maven-plugin repackage).
+        To remove a feature: exclude the corresponding platform module from dependencies.
+    </description>
+
+    <dependencies>
+        <!-- Platform modules -->
+        <dependency>
+            <groupId>wfederico</groupId>
+            <artifactId>platform-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>wfederico</groupId>
+            <artifactId>platform-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>wfederico</groupId>
+            <artifactId>platform-messaging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>wfederico</groupId>
+            <artifactId>platform-observability</artifactId>
+        </dependency>
+        <!-- Domain modules -->
+        <dependency>
+            <groupId>wfederico</groupId>
+            <artifactId>module-player</artifactId>
+        </dependency>
+        <!-- Runtime -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-docker-compose</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!-- DGS codegen for remote GraphQL schema client types -->
+            <plugin>
+                <groupId>io.github.deweyjose</groupId>
+                <artifactId>graphqlcodegen-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dgs-codegen</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <schemaPaths>
+                                <param>src/main/resources/graphql-client</param>
+                            </schemaPaths>
+                            <packageName>wfederico.backendjavacoretemplate.codegen</packageName>
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <disableDatesInGeneratedAnnotation>true</disableDatesInGeneratedAnnotation>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-dgs-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+

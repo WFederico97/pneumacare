@@ -1,0 +1,20 @@
+# Test datasource — overridden in CI by env vars; Testcontainers uses its own DataSource binding
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mi_base_de_datos}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:admin}
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+  kafka:
+    listener:
+      auto-startup: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+

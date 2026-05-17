@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: my-microservice # Change for the proper ms instead
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # 1. Db config
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:mi_base_de_datos}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Flyway (disabled by default in dev; enabled in staging/prod profiles)
+  flyway:
+    enabled: false
+
+  # 2. Redis config
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # password: ${REDIS_PASSWORD:} # Uncomment if redis has password enabled
+
+  # 3. Kafka configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKER:localhost:9092}
+    consumer:
+      group-id: my-microservice-group
+      auto-offset-reset: earliest
+
+  # 4. OAuth2 Resource Server (JWT)
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9000}
+
+# microservice configuration port
+server:
+  port: ${APP_PORT:8080}
+
+# 5. Swagger / OpenAPI configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+# 6. Actuator & Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        step: 10s
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+  tracing:
+    sampling:
+      probability: 1.0
+
+# 7. Rate limiting
+app:
+  rate-limit:
+    threshold: ${RATE_LIMIT_THRESHOLD:10}
+    window-seconds: ${RATE_LIMIT_WINDOW:60}
+
+# 8. Logging - include traceId/spanId in logs
+logging:
+  pattern:
+    correlation: '[${spring.application.name:},%mdc{traceId:-},%mdc{spanId:-}] '

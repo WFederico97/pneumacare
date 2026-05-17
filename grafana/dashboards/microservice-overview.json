@@ -1,0 +1,347 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"my-microservice\"}[1m])) by (method, uri, status)",
+          "legendFormat": "{{method}} {{uri}} [{{status}}]",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HTTP Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, uri))",
+          "legendFormat": "p95 {{uri}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HTTP Error Rate (5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"my-microservice\", status=~\"5..\"}[1m])) by (uri)",
+          "legendFormat": "5xx {{uri}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "PlayerService Method Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(player_service_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, method))",
+          "legendFormat": "p95 {{method}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(player_service_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, method))",
+          "legendFormat": "p50 {{method}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "PlayerService Call Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(player_service_milliseconds_count{job=\"my-microservice\"}[1m])) by (method)",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "JVM Heap Memory Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"my-microservice\", area=\"heap\"}",
+          "legendFormat": "{{id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "JVM Non-Heap Memory Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"my-microservice\", area=\"nonheap\"}",
+          "legendFormat": "{{id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "JVM Threads",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live{job=\"my-microservice\"}",
+          "legendFormat": "Live",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_threads_daemon{job=\"my-microservice\"}",
+          "legendFormat": "Daemon",
+          "refId": "B"
+        },
+        {
+          "expr": "jvm_threads_peak{job=\"my-microservice\"}",
+          "legendFormat": "Peak",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "GC Pause Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_milliseconds_sum{job=\"my-microservice\"}[1m])",
+          "legendFormat": "{{action}} {{cause}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "GC Memory Allocated / Promoted",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"my-microservice\"}[1m])",
+          "legendFormat": "Allocated",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"my-microservice\"}[1m])",
+          "legendFormat": "Promoted",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "Bps" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "targets": [
+        {
+          "expr": "process_cpu_usage{job=\"my-microservice\"}",
+          "legendFormat": "Process CPU",
+          "refId": "A"
+        },
+        {
+          "expr": "system_cpu_usage{job=\"my-microservice\"}",
+          "legendFormat": "System CPU",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "max": 1 },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HikariCP Active Connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{job=\"my-microservice\"}",
+          "legendFormat": "Active",
+          "refId": "A"
+        },
+        {
+          "expr": "hikaricp_connections_idle{job=\"my-microservice\"}",
+          "legendFormat": "Idle",
+          "refId": "B"
+        },
+        {
+          "expr": "hikaricp_connections_max{job=\"my-microservice\"}",
+          "legendFormat": "Max",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "HikariCP Connection Acquire Time p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_acquire_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "legendFormat": "p95 acquire",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Spring Data Repository Invocations p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(spring_data_repository_invocations_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, repository))",
+          "legendFormat": "p95 {{repository}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Producer Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_template_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "legendFormat": "p95 produce",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Consumer Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_listener_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "legendFormat": "p95 consume",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Process Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "process_uptime_milliseconds{job=\"my-microservice\"} / 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "JVM Info",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 48 },
+      "targets": [
+        {
+          "expr": "jvm_info{job=\"my-microservice\"}",
+          "legendFormat": "{{runtime}} {{version}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Security Filter Chain Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(spring_security_filterchains_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "legendFormat": "p95 filter chain",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["spring-boot", "micrometer", "otlp"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "My Microservice — Overview",
+  "uid": "my-microservice-overview",
+  "version": 1
+}
+
