@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes \
+            --latest
+
+      - name: Open backport PR to develop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          BRANCH="chore/backport-${TAG}"
+
+          # Skip if develop already contains everything in main
+          PENDING=$(git log origin/develop..HEAD --oneline | wc -l | tr -d ' ')
+          if [ "$PENDING" -eq "0" ]; then
+            echo "develop is already up to date with main — skipping backport PR."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --base develop \
+            --head "${BRANCH}" \
+            --title "chore: backport ${TAG} to develop" \
+            --body "$(printf 'Automated backport of release \`%s\` from \`main\` to \`develop\`.\n\nThis PR carries any commits that landed on \`main\` after the last merge from \`develop\` (e.g. hotfixes or release-process commits). Review and merge to keep \`develop\` in sync.' "${TAG}")"
