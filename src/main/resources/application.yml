@@ -1,6 +1,6 @@
 spring:
   application:
-    name: my-microservice # Change for the proper ms instead
+    name: pneumacare
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
@@ -30,19 +30,34 @@ spring:
       port: ${REDIS_PORT:6379}
       # password: ${REDIS_PASSWORD:} # Uncomment if redis has password enabled
 
-  # 3. Kafka configuration
-  kafka:
-    bootstrap-servers: ${KAFKA_BROKER:localhost:9092}
-    consumer:
-      group-id: my-microservice-group
-      auto-offset-reset: earliest
-
-  # 4. OAuth2 Resource Server (JWT)
+  # 3. OAuth2 Resource Server (JWT)
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9000}
+
+  # 4. Kafka — disabled by default for local dev without Docker.
+  #    Set KAFKA_ENABLED=true (and KAFKA_BOOTSTRAP_SERVERS) when running the full stack.
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      fail-fast: false          # prevent startup failure if broker is temporarily unreachable
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: "false"
+    consumer:
+      group-id: ${spring.application.name}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.add.type.headers: "false"
+    listener:
+      observation-enabled: true  # enables Micrometer observations on @KafkaListener methods
 
 # microservice configuration port
 server:
@@ -83,6 +98,10 @@ management:
 
 # 7. Rate limiting
 app:
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+    topics:
+      prefix: ${KAFKA_TOPICS_PREFIX:pneumacare.events}
   rate-limit:
     threshold: ${RATE_LIMIT_THRESHOLD:10}
     window-seconds: ${RATE_LIMIT_WINDOW:60}
