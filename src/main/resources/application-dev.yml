@@ -17,6 +17,6 @@ management:
 
 logging:
   level:
-    wfederico.backendjavacoretemplate: DEBUG
+    wfederico.pneumacare: DEBUG
     org.hibernate.SQL: DEBUG
 

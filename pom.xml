@@ -8,11 +8,11 @@
         <version>4.0.3</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>wfederico</groupId>
-    <artifactId>backend-java-core-template</artifactId>
+    <groupId>com.pneumacare</groupId>
+    <artifactId>pneumacare</artifactId>
     <version>1.1.0</version>
-    <name>backend-java-core-template</name>
-    <description>backend-java-core-template</description>
+    <name>pneumacare</name>
+    <description>Pneumacare</description>
     <url/>
     <licenses>
         <license/>
@@ -59,8 +59,12 @@
             <artifactId>spring-boot-starter-graphql</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-kafka</artifactId>
+            <artifactId>spring-boot-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -165,11 +169,6 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-kafka-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-opentelemetry-test</artifactId>
             <scope>test</scope>
         </dependency>
@@ -220,12 +219,17 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>kafka</artifactId>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -258,45 +262,6 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>io.github.deweyjose</groupId>
-                <artifactId>graphqlcodegen-maven-plugin</artifactId>
-                <version>1.61.5</version>
-                <executions>
-                    <execution>
-                        <id>dgs-codegen</id>
-                        <goals>
-                            <goal>generate</goal>
-                        </goals>
-                        <configuration>
-                            <schemaPaths>
-                                <param>src/main/resources/graphql-client</param>
-                            </schemaPaths>
-                            <packageName>wfederico.backendjavacoretemplate.codegen</packageName>
-                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
-                            <disableDatesInGeneratedAnnotation>true</disableDatesInGeneratedAnnotation>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>add-dgs-source</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.build.directory}/generated-sources</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <!-- TODO: Add asciidoctor-maven-plugin when spring-restdocs-asciidoctor is available for Spring Boot 4 -->
             <plugin>

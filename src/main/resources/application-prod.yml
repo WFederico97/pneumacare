@@ -17,5 +17,5 @@ management:
 
 logging:
   level:
-    wfederico.backendjavacoretemplate: WARN
+    wfederico.pneumacare: WARN
 

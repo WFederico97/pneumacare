@@ -1,4 +1,4 @@
-# backend-java-core-template
+# Pneumacare
 
 Spring Boot 4.0.3 REST microservice scaffold implementing a layered hexagonal architecture. Java 17. Maven build. Dockerized with PostgreSQL, Redis, Kafka, and Grafana LGTM (Loki, Grafana, Tempo, Mimir) for full observability.
 
