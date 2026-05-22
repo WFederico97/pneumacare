@@ -281,7 +281,7 @@ Copy `.env.example` to `.env` and adjust before running `docker compose up`.
 | `app` | `pneumacare-app` | Built from `Dockerfile` | Spring Boot application | `wget /actuator/health` (10 s interval, 30 s start period) |
 | `postgres` | `pneumacare-postgres` | `postgres:17` | Primary datastore | `pg_isready` |
 | `redis` | `pneumacare-redis` | `redis:7.4` | Rate limiting, caching, IP blacklist | None |
-| `kafka` | `pneumacare-kafka` | `bitnami/kafka:3.9` | Event streaming, KRaft mode (no ZooKeeper) | `kafka-topics.sh --list` |
+| `kafka` | `pneumacare-kafka` | `apache/kafka:3.9.2` | Event streaming, KRaft mode (no ZooKeeper) | `/opt/kafka/bin/kafka-topics.sh --list` |
 | `grafana-lgtm` | `pneumacare-grafana` | `grafana/otel-lgtm:0.9.1` | Grafana + Loki + Tempo + Mimir | None |
 
 The `app` service starts only after `postgres` (healthy) and `kafka` (healthy). Kafka has `KAFKA_ENABLED=true` and `KAFKA_BOOTSTRAP_SERVERS=kafka:9092` injected automatically by `compose.yaml`.
