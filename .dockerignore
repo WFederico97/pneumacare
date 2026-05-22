@@ -1,0 +1,9 @@
+.git
+.github
+.mvn/repository
+target/
+*.md
+.env
+.env.example
+grafana/
+SOPORTE-UTI-RESPI/
