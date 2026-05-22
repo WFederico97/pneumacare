@@ -12,7 +12,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"my-microservice\"}[1m])) by (method, uri, status)",
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"pneumacare\"}[1m])) by (method, uri, status)",
           "legendFormat": "{{method}} {{uri}} [{{status}}]",
           "refId": "A"
         }
@@ -28,7 +28,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, uri))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, uri))",
           "legendFormat": "p95 {{uri}}",
           "refId": "A"
         }
@@ -44,7 +44,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"my-microservice\", status=~\"5..\"}[1m])) by (uri)",
+          "expr": "sum(rate(http_server_requests_milliseconds_count{job=\"pneumacare\", status=~\"5..\"}[1m])) by (uri)",
           "legendFormat": "5xx {{uri}}",
           "refId": "A"
         }
@@ -55,18 +55,18 @@
       }
     },
     {
-      "title": "PlayerService Method Duration",
+      "title": "Service Method Duration (placeholder — add @Observed services here)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(player_service_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, method))",
-          "legendFormat": "p95 {{method}}",
+          "expr": "histogram_quantile(0.95, sum(rate(observations_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, name))",
+          "legendFormat": "p95 {{name}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(player_service_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, method))",
-          "legendFormat": "p50 {{method}}",
+          "expr": "histogram_quantile(0.50, sum(rate(observations_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, name))",
+          "legendFormat": "p50 {{name}}",
           "refId": "B"
         }
       ],
@@ -76,13 +76,13 @@
       }
     },
     {
-      "title": "PlayerService Call Rate",
+      "title": "Service Method Call Rate",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
         {
-          "expr": "sum(rate(player_service_milliseconds_count{job=\"my-microservice\"}[1m])) by (method)",
-          "legendFormat": "{{method}}",
+          "expr": "sum(rate(observations_milliseconds_count{job=\"pneumacare\"}[1m])) by (name)",
+          "legendFormat": "{{name}}",
           "refId": "A"
         }
       ],
@@ -97,7 +97,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"my-microservice\", area=\"heap\"}",
+          "expr": "jvm_memory_used_bytes{job=\"pneumacare\", area=\"heap\"}",
           "legendFormat": "{{id}}",
           "refId": "A"
         }
@@ -113,7 +113,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "targets": [
         {
-          "expr": "jvm_memory_used_bytes{job=\"my-microservice\", area=\"nonheap\"}",
+          "expr": "jvm_memory_used_bytes{job=\"pneumacare\", area=\"nonheap\"}",
           "legendFormat": "{{id}}",
           "refId": "A"
         }
@@ -129,17 +129,17 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "targets": [
         {
-          "expr": "jvm_threads_live{job=\"my-microservice\"}",
+          "expr": "jvm_threads_live{job=\"pneumacare\"}",
           "legendFormat": "Live",
           "refId": "A"
         },
         {
-          "expr": "jvm_threads_daemon{job=\"my-microservice\"}",
+          "expr": "jvm_threads_daemon{job=\"pneumacare\"}",
           "legendFormat": "Daemon",
           "refId": "B"
         },
         {
-          "expr": "jvm_threads_peak{job=\"my-microservice\"}",
+          "expr": "jvm_threads_peak{job=\"pneumacare\"}",
           "legendFormat": "Peak",
           "refId": "C"
         }
@@ -151,7 +151,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
       "targets": [
         {
-          "expr": "rate(jvm_gc_pause_milliseconds_sum{job=\"my-microservice\"}[1m])",
+          "expr": "rate(jvm_gc_pause_milliseconds_sum{job=\"pneumacare\"}[1m])",
           "legendFormat": "{{action}} {{cause}}",
           "refId": "A"
         }
@@ -167,12 +167,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
       "targets": [
         {
-          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"my-microservice\"}[1m])",
+          "expr": "rate(jvm_gc_memory_allocated_bytes_total{job=\"pneumacare\"}[1m])",
           "legendFormat": "Allocated",
           "refId": "A"
         },
         {
-          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"my-microservice\"}[1m])",
+          "expr": "rate(jvm_gc_memory_promoted_bytes_total{job=\"pneumacare\"}[1m])",
           "legendFormat": "Promoted",
           "refId": "B"
         }
@@ -188,12 +188,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
       "targets": [
         {
-          "expr": "process_cpu_usage{job=\"my-microservice\"}",
+          "expr": "process_cpu_usage{job=\"pneumacare\"}",
           "legendFormat": "Process CPU",
           "refId": "A"
         },
         {
-          "expr": "system_cpu_usage{job=\"my-microservice\"}",
+          "expr": "system_cpu_usage{job=\"pneumacare\"}",
           "legendFormat": "System CPU",
           "refId": "B"
         }
@@ -209,17 +209,17 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
       "targets": [
         {
-          "expr": "hikaricp_connections_active{job=\"my-microservice\"}",
+          "expr": "hikaricp_connections_active{job=\"pneumacare\"}",
           "legendFormat": "Active",
           "refId": "A"
         },
         {
-          "expr": "hikaricp_connections_idle{job=\"my-microservice\"}",
+          "expr": "hikaricp_connections_idle{job=\"pneumacare\"}",
           "legendFormat": "Idle",
           "refId": "B"
         },
         {
-          "expr": "hikaricp_connections_max{job=\"my-microservice\"}",
+          "expr": "hikaricp_connections_max{job=\"pneumacare\"}",
           "legendFormat": "Max",
           "refId": "C"
         }
@@ -231,7 +231,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_acquire_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_acquire_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
           "legendFormat": "p95 acquire",
           "refId": "A"
         }
@@ -247,7 +247,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(spring_data_repository_invocations_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le, repository))",
+          "expr": "histogram_quantile(0.95, sum(rate(spring_data_repository_invocations_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, repository))",
           "legendFormat": "p95 {{repository}}",
           "refId": "A"
         }
@@ -263,7 +263,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_template_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_template_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
           "legendFormat": "p95 produce",
           "refId": "A"
         }
@@ -279,7 +279,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_listener_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_listener_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
           "legendFormat": "p95 consume",
           "refId": "A"
         }
@@ -295,7 +295,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 48 },
       "targets": [
         {
-          "expr": "process_uptime_milliseconds{job=\"my-microservice\"} / 1000",
+          "expr": "process_uptime_milliseconds{job=\"pneumacare\"} / 1000",
           "refId": "A"
         }
       ],
@@ -310,7 +310,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 48 },
       "targets": [
         {
-          "expr": "jvm_info{job=\"my-microservice\"}",
+          "expr": "jvm_info{job=\"pneumacare\"}",
           "legendFormat": "{{runtime}} {{version}}",
           "refId": "A"
         }
@@ -322,7 +322,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(spring_security_filterchains_milliseconds_bucket{job=\"my-microservice\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(spring_security_filterchains_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
           "legendFormat": "p95 filter chain",
           "refId": "A"
         }
@@ -340,8 +340,8 @@
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "My Microservice — Overview",
-  "uid": "my-microservice-overview",
+  "title": "Pneumacare — Overview",
+  "uid": "pneumacare-overview",
   "version": 1
 }
 
