@@ -1,4 +1,9 @@
 # Development profile
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:4200
+
 spring:
   jpa:
     hibernate:

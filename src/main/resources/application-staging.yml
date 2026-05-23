@@ -1,4 +1,8 @@
 # Staging profile
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
 spring:
   jpa:
     hibernate:

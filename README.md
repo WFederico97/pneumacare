@@ -90,11 +90,14 @@ src/main/java/wfederico/pneumacare/
     │   ├── BusinessLayerException.java     Unchecked exception carrying an HttpStatus.
     │   └── GlobalExceptionHandler.java     @RestControllerAdvice: Exception (500), MethodArgumentNotValidException (400), BusinessLayerException (dynamic).
     ├── security/
+    │   ├── CorsProperties.java             @ConfigurationProperties(prefix = "app.cors"). Holds allowed-origins list.
     │   ├── RateLimitProperties.java        @ConfigurationProperties(prefix = "app.rate-limit").
-    │   ├── SecurityConfig.java             Profile-split filter chains (dev vs staging/prod).
+    │   ├── SecurityConfig.java             Profile-split filter chains (dev vs staging/prod). Wires CORS + rate limiting.
     │   └── SecurityFilter.java             IP blacklist (403) + rate limiting (429) via Redis.
     └── web/
-        └── ApiResponseBase.java            @Builder envelope: status, message, data<T>, traceId.
+        ├── ApiResponseBase.java            @Builder envelope: status, message, data<T>, traceId.
+        ├── HealthController.java           GET /api/health — connectivity and service health check.
+        └── HealthStatusResponse.java       Record DTO: status ("UP"), timestamp (Instant).
 
 src/main/resources/
 ├── application.yml                         Base configuration (all profiles).
@@ -164,8 +167,9 @@ See [Event Publishing](#event-publishing) for full detail.
 
 | Class | Description |
 |---|---|
+| `CorsProperties` | `@ConfigurationProperties(prefix = "app.cors")`. Field: `allowedOrigins` (list). Populated per profile from YAML; overridable with `CORS_ALLOWED_ORIGINS` env var in staging/prod. |
 | `RateLimitProperties` | `@ConfigurationProperties(prefix = "app.rate-limit")`. Fields: `threshold` (default 10), `windowSeconds` (default 60). |
-| `SecurityConfig` | Registers two `SecurityFilterChain` beans: one for `dev` (all `/api/**` open, no OAuth2), one for `!dev` (OAuth2 JWT + scope-based rules). Both chains are stateless, CSRF-disabled, and inject `SecurityFilter`. |
+| `SecurityConfig` | Registers two `SecurityFilterChain` beans: one for `dev` (all `/api/**` open, no OAuth2), one for `!dev` (OAuth2 JWT + scope-based rules). Both chains are stateless, CSRF-disabled, CORS-enabled, and inject `SecurityFilter`. Exposes `CorsConfigurationSource` bean used by both chains. |
 | `SecurityFilter` | `OncePerRequestFilter`. Checks Redis `blacklist:{ip}` → 403 `ApiResponseBase`. Checks Redis `rate_limit:{ip}` counter → 429 `ApiResponseBase` when threshold exceeded. |
 
 > **Note**: `SecurityConfig` uses `tools.jackson.databind.ObjectMapper` (Jackson 3.x, bundled with Spring Boot 4). Do not replace with `com.fasterxml.jackson.databind.ObjectMapper`.
@@ -182,6 +186,10 @@ ApiResponseBase.<MyDto>builder()
     .traceId(MDC.get("traceId"))
     .build();
 ```
+
+`HealthController` — exposes `GET /api/health` for frontend-backend connectivity checks. Returns an `ApiResponseBase<HealthStatusResponse>` with `status: "UP"` and an `Instant` timestamp. Permitted without authentication in all profiles.
+
+`HealthStatusResponse` — immutable record DTO (`status`, `timestamp`) produced by `HealthController.health()` via the static factory `HealthStatusResponse.up()`.
 
 ---
 
@@ -269,6 +277,7 @@ Consumer-side errors are handled by `KafkaConfig`'s `DefaultErrorHandler`:
 | `OAUTH2_ISSUER_URI` | `http://localhost:9000` | OAuth2 JWT issuer URI (staging/prod) |
 | `RATE_LIMIT_THRESHOLD` | `10` | Max requests per window per IP |
 | `RATE_LIMIT_WINDOW` | `60` | Rate-limit window in seconds |
+| `CORS_ALLOWED_ORIGINS` | _(none)_ | Comma-separated allowed origins for CORS in staging/prod (e.g. `https://app.example.com`) |
 
 Copy `.env.example` to `.env` and adjust before running `docker compose up`.
 
@@ -322,11 +331,29 @@ OAuth2 JWT validation is active (`spring.security.oauth2.resourceserver.jwt`). S
 
 | Method | Path pattern | Required authority |
 |---|---|---|
+| `GET` | `/api/health` | None (permit all) |
 | `GET` | `/api/**` | `SCOPE_read` |
 | `POST`, `PUT`, `PATCH`, `DELETE` | `/api/**` | `SCOPE_write` |
 | Any | `/actuator/**`, `/swagger-ui/**`, `/v3/api-docs/**` | None (permit all) |
 
 All chains are **stateless** (no sessions) and **CSRF-disabled**.
+
+### CORS
+
+CORS is enabled on both filter chains via a shared `CorsConfigurationSource` bean. Allowed origins are loaded from `app.cors.allowed-origins` (YAML) or the `CORS_ALLOWED_ORIGINS` environment variable.
+
+| Setting | Value |
+|---|---|
+| Allowed origins | Profile-specific (see below) |
+| Allowed methods | `GET POST PUT PATCH DELETE OPTIONS` |
+| Allowed headers | `Authorization`, `Content-Type`, `Accept`, `X-Requested-With` |
+| Allow credentials | `false` (stateless JWT API — no cookies) |
+| Preflight max-age | `3600 s` |
+
+| Profile | Allowed origins |
+|---|---|
+| `dev` | `http://localhost:4200` |
+| `staging` / `prod` | `${CORS_ALLOWED_ORIGINS}` (env var, comma-separated for multiple origins) |
 
 ### SecurityFilter (all profiles)
 
@@ -431,8 +458,9 @@ docker compose up --build
 | URL | Service |
 |---|---|
 | `http://localhost:8080` | Application |
+| `http://localhost:8080/api/health` | Custom health check (connectivity check, no auth required) |
 | `http://localhost:8080/swagger-ui.html` | Swagger UI |
-| `http://localhost:8080/actuator/health` | Health check |
+| `http://localhost:8080/actuator/health` | Actuator health (infrastructure details) |
 | `http://localhost:8080/actuator/prometheus` | Prometheus metrics |
 | `http://localhost:3000` | Grafana |
 

@@ -14,20 +14,30 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(RateLimitProperties.class)
+@EnableConfigurationProperties({RateLimitProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final RateLimitProperties rateLimitProperties;
+    private final CorsProperties corsProperties;
 
-    public SecurityConfig(StringRedisTemplate redisTemplate, ObjectMapper objectMapper, RateLimitProperties rateLimitProperties) {
+    public SecurityConfig(StringRedisTemplate redisTemplate,
+                          ObjectMapper objectMapper,
+                          RateLimitProperties rateLimitProperties,
+                          CorsProperties corsProperties) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.rateLimitProperties = rateLimitProperties;
+        this.corsProperties = corsProperties;
     }
 
     // ── Dev profile: no OAuth2, all /api/** open ──────────────────────────
@@ -35,6 +45,7 @@ public class SecurityConfig {
     @Profile("dev")
     public SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -54,12 +65,14 @@ public class SecurityConfig {
     @Profile("!dev")
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAuthority("SCOPE_read")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAuthority("SCOPE_write")
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAuthority("SCOPE_write")
@@ -76,5 +89,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilter securityFilter() {
         return new SecurityFilter(redisTemplate, objectMapper, rateLimitProperties);
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedOrigins(corsProperties.getAllowedOrigins());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+        // Credentials (cookies/auth headers forwarded by the browser) are not used
+        // in a stateless JWT API — keep false to avoid overly broad CORS grants.
+        config.setAllowCredentials(false);
+        // Cache preflight response for 1 hour to reduce OPTIONS round-trips.
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
