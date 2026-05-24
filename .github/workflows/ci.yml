@@ -15,13 +15,13 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: mi_base_de_datos
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U ${{ secrets.DB_USER }}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -30,6 +30,11 @@ jobs:
         image: redis:7.4
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -46,14 +51,14 @@ jobs:
 
       - name: Build and test
         env:
+          SPRING_PROFILES_ACTIVE: dev
           DB_HOST: localhost
           DB_PORT: 5432
-          DB_NAME: mi_base_de_datos
-          DB_USER: postgres
-          DB_PASSWORD: admin
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           REDIS_HOST: localhost
           REDIS_PORT: 6379
-          SPRING_PROFILES_ACTIVE: dev
         run: ./mvnw verify -B
 
       - name: Publish test results
