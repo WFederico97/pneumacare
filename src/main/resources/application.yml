@@ -64,6 +64,11 @@ spring:
 # microservice configuration port
 server:
   port: ${APP_PORT:8080}
+  # Trust X-Forwarded-For / X-Real-IP headers from the nginx reverse proxy so
+  # that SecurityFilter.getRemoteAddr() resolves to the real client IP instead
+  # of nginx's container IP, preserving Redis-based per-IP rate-limiting and
+  # blacklisting. Tomcat's RemoteIpValve handles the actual header processing.
+  forward-headers-strategy: native
 
 # 5. Swagger / OpenAPI configuration
 springdoc:
