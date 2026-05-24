@@ -1,0 +1,92 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Cancel in-flight runs for the same branch/PR to avoid wasting runner minutes.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile, Test & Package
+    runs-on: ubuntu-latest
+    # AC: pipeline must complete within 5 minutes.
+    timeout-minutes: 5
+
+    # Ephemeral CI credentials defined once at job level.
+    # Secrets take precedence when configured; fallback values keep the workflow
+    # green for forked PRs where secrets are not injected by GitHub.
+    # All steps in this job inherit these variables automatically.
+    env:
+      DB_NAME: ${{ secrets.DB_NAME || 'pneumacare_ci' }}
+      DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci_postgres_pw' }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: dev
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # GitHub Actions does not expose the job-level `env` context inside
+          # service-container configuration blocks, so the fallback expressions
+          # must be repeated here verbatim to stay in sync with the job env above.
+          POSTGRES_DB: ${{ secrets.DB_NAME || 'pneumacare_ci' }}
+          POSTGRES_USER: ${{ secrets.DB_USER || 'postgres' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci_postgres_pw' }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
+      # AC2: full mvn clean install lifecycle. Any JUnit failure exits non-zero
+      # and GitHub Actions marks the step — and the whole workflow run — as failed.
+      # DB_NAME / DB_USER / DB_PASSWORD / DB_HOST / DB_PORT / REDIS_* /
+      # SPRING_PROFILES_ACTIVE are inherited from the job-level env block above.
+      - name: Build, test and install
+        run: ./mvnw clean install -B
+
+      # Always upload Surefire XML reports so failures are visible in the
+      # GitHub Actions UI even when the build step itself fails (AC3 support).
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-${{ github.run_id }}
+          path: target/surefire-reports/*.xml
+          if-no-files-found: ignore

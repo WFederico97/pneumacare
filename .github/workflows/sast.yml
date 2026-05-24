@@ -1,0 +1,79 @@
+name: SAST
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  # Weekly full scan on Monday at 02:00 UTC to catch newly-disclosed CVEs.
+  schedule:
+    - cron: '0 2 * * 1'
+
+# Cancel in-flight scans for the same branch/PR.
+concurrency:
+  group: sast-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL Analysis (Java)
+    runs-on: ubuntu-latest
+    # Required permissions for uploading SARIF results to the Security tab.
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # Initialise the CodeQL database for Java.
+      # 'security-and-quality' adds both security-extended queries and
+      # code-quality rules on top of the default security set.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java
+          queries: security-and-quality
+
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
+      # CodeQL requires an actual build to trace bytecode; -DskipTests keeps
+      # this job fast — its purpose is static analysis, not test execution.
+      - name: Build project for analysis
+        run: ./mvnw clean compile -DskipTests -B
+
+      # Upload SARIF to GitHub Advanced Security / Security tab.
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:java"
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    # Only runs on pull requests — checks new/changed dependencies for known CVEs.
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Fail the PR if any dependency introduces a vulnerability rated HIGH or CRITICAL.
+          fail-on-severity: high
+          comment-summary-in-pr: always

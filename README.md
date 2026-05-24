@@ -3,6 +3,10 @@
 > Clinical decision-support backend for ICU respiratory physiotherapy.
 > Spring Boot 4.0.3 · Java 17 · Maven · Hexagonal monolith · PostgreSQL · Redis · Kafka · Grafana LGTM
 
+[![Build](https://github.com/wfederico97/pneumacare/actions/workflows/build.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/build.yml)
+[![CI](https://github.com/wfederico97/pneumacare/actions/workflows/ci.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/ci.yml)
+[![SAST](https://github.com/wfederico97/pneumacare/actions/workflows/sast.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/sast.yml)
+
 ---
 
 ## Table of Contents
@@ -29,6 +33,10 @@
 - [GraphQL](#graphql)
 - [Testing](#testing)
 - [CI/CD](#cicd)
+  - [build.yml — Build pipeline](#buildyml--build-pipeline)
+  - [ci.yml — Full integration pipeline](#ciyml--full-integration-pipeline)
+  - [sast.yml — Static analysis](#sastyml--static-analysis)
+  - [GitHub Secrets](#github-secrets)
 - [Running](#running)
 - [Releases and Docker Image](#releases-and-docker-image)
 
@@ -266,7 +274,7 @@ Consumer-side errors are handled by `KafkaConfig`'s `DefaultErrorHandler`:
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `mi_base_de_datos` | Database name |
 | `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | `admin` | Database password |
+| `DB_PASSWORD` | _(no default — must be set)_ | Database password |
 | `REDIS_HOST` | `localhost` | Redis hostname |
 | `REDIS_PORT` | `6379` | Redis port |
 | `KAFKA_ENABLED` | `false` | `true` to activate Kafka event publisher |
@@ -285,6 +293,26 @@ Copy `.env.example` to `.env` and adjust before running `docker compose up`.
 
 ## Docker Compose Services
 
+Two Compose files are provided:
+
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | **Database only** — PostgreSQL 17 on port 5432 (localhost-bound). Use this for local development when you only need the database. |
+| `compose.yaml` | **Full stack** — all services (app, PostgreSQL 17, Redis, Kafka, Grafana LGTM). |
+
+### `docker-compose.yml` services
+
+| Service | Image | Port | Volume |
+|---|---|---|---|
+| `postgres` | `postgres:17` | `127.0.0.1:5432` | `postgres_data_dev` (persists across restarts; distinct from the `postgres_data` volume used by `compose.yaml`) |
+
+```bash
+cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD (required — no insecure defaults)
+docker compose up -d   # AC1: PostgreSQL 17 listening on 127.0.0.1:5432
+```
+
+### `compose.yaml` services
+
 | Service | Container | Image | Purpose | Healthcheck |
 |---|---|---|---|---|
 | `app` | `pneumacare-app` | Built from `Dockerfile` | Spring Boot application | `wget /actuator/health` (10 s interval, 30 s start period) |
@@ -295,7 +323,7 @@ Copy `.env.example` to `.env` and adjust before running `docker compose up`.
 
 The `app` service starts only after `postgres` (healthy) and `kafka` (healthy). Kafka has `KAFKA_ENABLED=true` and `KAFKA_BOOTSTRAP_SERVERS=kafka:9092` injected automatically by `compose.yaml`.
 
-Persistent volumes: `postgres_data`, `redis_data`, `kafka_data`.
+Persistent volumes: `postgres_data_dev` (database-only stack), `postgres_data` / `redis_data` / `kafka_data` (full stack).
 
 ---
 
@@ -418,11 +446,29 @@ Run the test suite:
 
 ## CI/CD
 
-### `ci.yml` — triggered on push/PR to `main` and `develop`, and on `v*.*.*` tags
+Three workflow files live in `.github/workflows/`. Credentials are supplied via **GitHub Secrets** with safe fallback values so workflows also pass for forked PRs where secrets are unavailable.
+
+### `build.yml` — Build pipeline
+
+**Triggers**: push or pull request targeting `main` or `develop`.
+
+| Step | Detail |
+|---|---|
+| PostgreSQL 17 service container | Credentials from `DB_NAME`, `DB_USER`, `DB_PASSWORD` secrets (fallback: `pneumacare_ci` / `postgres` / `ci_postgres_pw`) |
+| Redis 7.4 service container | Health-checked with `redis-cli ping` |
+| JDK 17 Temurin | Maven dependency cache enabled |
+| `./mvnw clean install -B` | Full build + test lifecycle. Any JUnit failure exits non-zero and blocks merge. |
+| Upload Surefire reports | Runs `if: always()` so failures are visible in the Actions UI |
+
+A `timeout-minutes: 5` gate enforces the 5-minute execution threshold. Concurrent runs for the same branch are cancelled automatically. Credentials are defined once at job level and inherited by all steps; service containers repeat the same fallback expressions (GitHub Actions does not expose job-level `env` inside service-container config blocks).
+
+### `ci.yml` — Full integration pipeline
+
+**Triggers**: push to `main`, `develop`, `feat/**`; version tags `v*.*.*`; PRs to `main`/`develop`.
 
 **`build` job** (always runs):
 
-1. Starts PostgreSQL 17 and Redis 7.4 service containers.
+1. Starts PostgreSQL 17 and Redis 7.4 service containers (credentials from secrets with fallbacks).
 2. Sets up JDK 17 (Temurin) with Maven dependency cache.
 3. Runs `./mvnw verify -B`.
 4. Uploads Surefire XML reports as a build artifact (`if: always()`).
@@ -434,9 +480,30 @@ Run the test suite:
 2. Extracts semver tags and SHA tag via `docker/metadata-action@v5`.
 3. Builds and pushes to `ghcr.io/<owner>/pneumacare` with the same GHA layer cache.
 
-### `opencode.yml` — triggered on `issue_comment` and `pull_request_review_comment`
+### `sast.yml` — Static analysis
+
+**Triggers**: push or PR to `main`/`develop`, plus a weekly scheduled scan (Monday 02:00 UTC).
+
+| Job | Tool | Purpose |
+|---|---|---|
+| `codeql` | GitHub CodeQL (`security-and-quality` query suite) | Scans Java bytecode for security vulnerabilities and code-quality issues; uploads SARIF to the Security tab |
+| `dependency-review` | `actions/dependency-review-action@v4` | PRs only — blocks merge if any new dependency introduces a HIGH or CRITICAL CVE |
+
+### `opencode.yml` — AI agent trigger
 
 Runs the OpenCode agent when a comment body contains `/oc` or `/opencode`. Requires `OPENCODE_API_KEY` secret. Permissions: `contents`, `pull-requests`, and `issues` set to `write` so the agent can create branches, commit fixes, open PRs, and post replies.
+
+### GitHub Secrets
+
+Secrets are optional — workflows include safe fallback values so they run on forked PRs without any secrets configured. When secrets are set, they override the fallbacks.
+
+| Secret | Fallback (CI only) | Purpose |
+|---|---|---|
+| `DB_NAME` | `pneumacare_ci` | PostgreSQL database name |
+| `DB_USER` | `postgres` | PostgreSQL user |
+| `DB_PASSWORD` | `ci_postgres_pw` | PostgreSQL password — set a real secret to avoid using the fallback in your environment |
+
+> **Note**: `DB_HOST`, `DB_PORT`, `REDIS_HOST`, and `REDIS_PORT` are not secrets — they are fixed topology values (`localhost` / standard ports) defined directly in the workflow `env` blocks.
 
 ---
 
