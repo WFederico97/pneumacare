@@ -3,6 +3,10 @@
 > Clinical decision-support backend for ICU respiratory physiotherapy.
 > Spring Boot 4.0.3 · Java 17 · Maven · Hexagonal monolith · PostgreSQL · Redis · Kafka · Grafana LGTM
 
+[![Build](https://github.com/wfederico97/pneumacare/actions/workflows/build.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/build.yml)
+[![CI](https://github.com/wfederico97/pneumacare/actions/workflows/ci.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/ci.yml)
+[![SAST](https://github.com/wfederico97/pneumacare/actions/workflows/sast.yml/badge.svg)](https://github.com/wfederico97/pneumacare/actions/workflows/sast.yml)
+
 ---
 
 ## Table of Contents
@@ -29,6 +33,10 @@
 - [GraphQL](#graphql)
 - [Testing](#testing)
 - [CI/CD](#cicd)
+  - [build.yml — Build pipeline](#buildyml--build-pipeline)
+  - [ci.yml — Full integration pipeline](#ciyml--full-integration-pipeline)
+  - [sast.yml — Static analysis](#sastyml--static-analysis)
+  - [GitHub Secrets](#github-secrets)
 - [Running](#running)
 - [Releases and Docker Image](#releases-and-docker-image)
 
@@ -285,6 +293,26 @@ Copy `.env.example` to `.env` and adjust before running `docker compose up`.
 
 ## Docker Compose Services
 
+Two Compose files are provided:
+
+| File | Purpose |
+|---|---|
+| `docker-compose.yml` | **Database only** — PostgreSQL 15 on port 5432. Use this for local development when you only need the database. |
+| `compose.yaml` | **Full stack** — all services (app, PostgreSQL 17, Redis, Kafka, Grafana LGTM). |
+
+### `docker-compose.yml` services
+
+| Service | Image | Port | Volume |
+|---|---|---|---|
+| `postgres` | `postgres:15` | `5432` | `postgres_data` (persists across restarts) |
+
+```bash
+cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD
+docker-compose up -d   # AC1: PostgreSQL 15 listening on :5432
+```
+
+### `compose.yaml` services
+
 | Service | Container | Image | Purpose | Healthcheck |
 |---|---|---|---|---|
 | `app` | `pneumacare-app` | Built from `Dockerfile` | Spring Boot application | `wget /actuator/health` (10 s interval, 30 s start period) |
@@ -418,11 +446,29 @@ Run the test suite:
 
 ## CI/CD
 
-### `ci.yml` — triggered on push/PR to `main` and `develop`, and on `v*.*.*` tags
+Three workflow files live in `.github/workflows/`. All sensitive variables are injected at runtime via **GitHub Secrets** — no credentials are hardcoded anywhere.
+
+### `build.yml` — Build pipeline
+
+**Triggers**: push or pull request targeting `main` or `develop`.
+
+| Step | Detail |
+|---|---|
+| PostgreSQL 15 service container | Credentials from `DB_NAME`, `DB_USER`, `DB_PASSWORD` secrets |
+| Redis 7.4 service container | Health-checked with `redis-cli ping` |
+| JDK 17 Temurin | Maven dependency cache enabled |
+| `./mvnw clean install -B` | Full build + test lifecycle. Any JUnit failure exits non-zero and blocks merge. |
+| Upload Surefire reports | Runs `if: always()` so failures are visible in the Actions UI |
+
+A `timeout-minutes: 5` gate enforces the 5-minute execution threshold. Concurrent runs for the same branch are cancelled automatically.
+
+### `ci.yml` — Full integration pipeline
+
+**Triggers**: push to `main`, `develop`, `feat/**`; version tags `v*.*.*`; PRs to `main`/`develop`.
 
 **`build` job** (always runs):
 
-1. Starts PostgreSQL 17 and Redis 7.4 service containers.
+1. Starts PostgreSQL 17 and Redis 7.4 service containers (credentials from secrets).
 2. Sets up JDK 17 (Temurin) with Maven dependency cache.
 3. Runs `./mvnw verify -B`.
 4. Uploads Surefire XML reports as a build artifact (`if: always()`).
@@ -434,9 +480,30 @@ Run the test suite:
 2. Extracts semver tags and SHA tag via `docker/metadata-action@v5`.
 3. Builds and pushes to `ghcr.io/<owner>/pneumacare` with the same GHA layer cache.
 
-### `opencode.yml` — triggered on `issue_comment` and `pull_request_review_comment`
+### `sast.yml` — Static analysis
+
+**Triggers**: push or PR to `main`/`develop`, plus a weekly scheduled scan (Monday 02:00 UTC).
+
+| Job | Tool | Purpose |
+|---|---|---|
+| `codeql` | GitHub CodeQL (`security-and-quality` query suite) | Scans Java bytecode for security vulnerabilities and code-quality issues; uploads SARIF to the Security tab |
+| `dependency-review` | `actions/dependency-review-action@v4` | PRs only — blocks merge if any new dependency introduces a HIGH or CRITICAL CVE |
+
+### `opencode.yml` — AI agent trigger
 
 Runs the OpenCode agent when a comment body contains `/oc` or `/opencode`. Requires `OPENCODE_API_KEY` secret. Permissions: `contents`, `pull-requests`, and `issues` set to `write` so the agent can create branches, commit fixes, open PRs, and post replies.
+
+### GitHub Secrets
+
+The following secrets must be configured in **Settings → Secrets and variables → Actions** before the workflows can run:
+
+| Secret | Example value | Purpose |
+|---|---|---|
+| `DB_NAME` | `pneumacare` | PostgreSQL database name used by service containers and the app |
+| `DB_USER` | `postgres` | PostgreSQL user |
+| `DB_PASSWORD` | _(strong password)_ | PostgreSQL password — never hardcode |
+
+> **Note**: `DB_HOST`, `DB_PORT`, `REDIS_HOST`, and `REDIS_PORT` are not secrets; they are set directly in the workflow `env` blocks (`localhost` / standard ports) because they describe the ephemeral CI network topology, not sensitive credentials.
 
 ---
 
