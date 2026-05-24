@@ -274,7 +274,7 @@ Consumer-side errors are handled by `KafkaConfig`'s `DefaultErrorHandler`:
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `DB_NAME` | `mi_base_de_datos` | Database name |
 | `DB_USER` | `postgres` | Database user |
-| `DB_PASSWORD` | `admin` | Database password |
+| `DB_PASSWORD` | _(no default — must be set)_ | Database password |
 | `REDIS_HOST` | `localhost` | Redis hostname |
 | `REDIS_PORT` | `6379` | Redis port |
 | `KAFKA_ENABLED` | `false` | `true` to activate Kafka event publisher |
@@ -297,18 +297,18 @@ Two Compose files are provided:
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | **Database only** — PostgreSQL 15 on port 5432. Use this for local development when you only need the database. |
+| `docker-compose.yml` | **Database only** — PostgreSQL 17 on port 5432 (localhost-bound). Use this for local development when you only need the database. |
 | `compose.yaml` | **Full stack** — all services (app, PostgreSQL 17, Redis, Kafka, Grafana LGTM). |
 
 ### `docker-compose.yml` services
 
 | Service | Image | Port | Volume |
 |---|---|---|---|
-| `postgres` | `postgres:15` | `5432` | `postgres_data` (persists across restarts) |
+| `postgres` | `postgres:17` | `127.0.0.1:5432` | `postgres_data_dev` (persists across restarts; distinct from the `postgres_data` volume used by `compose.yaml`) |
 
 ```bash
-cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD
-docker-compose up -d   # AC1: PostgreSQL 15 listening on :5432
+cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD (required — no insecure defaults)
+docker compose up -d   # AC1: PostgreSQL 17 listening on 127.0.0.1:5432
 ```
 
 ### `compose.yaml` services
@@ -323,7 +323,7 @@ docker-compose up -d   # AC1: PostgreSQL 15 listening on :5432
 
 The `app` service starts only after `postgres` (healthy) and `kafka` (healthy). Kafka has `KAFKA_ENABLED=true` and `KAFKA_BOOTSTRAP_SERVERS=kafka:9092` injected automatically by `compose.yaml`.
 
-Persistent volumes: `postgres_data`, `redis_data`, `kafka_data`.
+Persistent volumes: `postgres_data_dev` (database-only stack), `postgres_data` / `redis_data` / `kafka_data` (full stack).
 
 ---
 
@@ -446,7 +446,7 @@ Run the test suite:
 
 ## CI/CD
 
-Three workflow files live in `.github/workflows/`. All sensitive variables are injected at runtime via **GitHub Secrets** — no credentials are hardcoded anywhere.
+Three workflow files live in `.github/workflows/`. Credentials are supplied via **GitHub Secrets** with safe fallback values so workflows also pass for forked PRs where secrets are unavailable.
 
 ### `build.yml` — Build pipeline
 
@@ -454,13 +454,13 @@ Three workflow files live in `.github/workflows/`. All sensitive variables are i
 
 | Step | Detail |
 |---|---|
-| PostgreSQL 15 service container | Credentials from `DB_NAME`, `DB_USER`, `DB_PASSWORD` secrets |
+| PostgreSQL 17 service container | Credentials from `DB_NAME`, `DB_USER`, `DB_PASSWORD` secrets (fallback: `pneumacare_ci` / `postgres` / `ci_postgres_pw`) |
 | Redis 7.4 service container | Health-checked with `redis-cli ping` |
 | JDK 17 Temurin | Maven dependency cache enabled |
 | `./mvnw clean install -B` | Full build + test lifecycle. Any JUnit failure exits non-zero and blocks merge. |
 | Upload Surefire reports | Runs `if: always()` so failures are visible in the Actions UI |
 
-A `timeout-minutes: 5` gate enforces the 5-minute execution threshold. Concurrent runs for the same branch are cancelled automatically.
+A `timeout-minutes: 5` gate enforces the 5-minute execution threshold. Concurrent runs for the same branch are cancelled automatically. Credentials are defined once at job level and inherited by all steps; service containers repeat the same fallback expressions (GitHub Actions does not expose job-level `env` inside service-container config blocks).
 
 ### `ci.yml` — Full integration pipeline
 
@@ -468,7 +468,7 @@ A `timeout-minutes: 5` gate enforces the 5-minute execution threshold. Concurren
 
 **`build` job** (always runs):
 
-1. Starts PostgreSQL 17 and Redis 7.4 service containers (credentials from secrets).
+1. Starts PostgreSQL 17 and Redis 7.4 service containers (credentials from secrets with fallbacks).
 2. Sets up JDK 17 (Temurin) with Maven dependency cache.
 3. Runs `./mvnw verify -B`.
 4. Uploads Surefire XML reports as a build artifact (`if: always()`).
@@ -495,15 +495,15 @@ Runs the OpenCode agent when a comment body contains `/oc` or `/opencode`. Requi
 
 ### GitHub Secrets
 
-The following secrets must be configured in **Settings → Secrets and variables → Actions** before the workflows can run:
+Secrets are optional — workflows include safe fallback values so they run on forked PRs without any secrets configured. When secrets are set, they override the fallbacks.
 
-| Secret | Example value | Purpose |
+| Secret | Fallback (CI only) | Purpose |
 |---|---|---|
-| `DB_NAME` | `pneumacare` | PostgreSQL database name used by service containers and the app |
+| `DB_NAME` | `pneumacare_ci` | PostgreSQL database name |
 | `DB_USER` | `postgres` | PostgreSQL user |
-| `DB_PASSWORD` | _(strong password)_ | PostgreSQL password — never hardcode |
+| `DB_PASSWORD` | `ci_postgres_pw` | PostgreSQL password — set a real secret to avoid using the fallback in your environment |
 
-> **Note**: `DB_HOST`, `DB_PORT`, `REDIS_HOST`, and `REDIS_PORT` are not secrets; they are set directly in the workflow `env` blocks (`localhost` / standard ports) because they describe the ephemeral CI network topology, not sensitive credentials.
+> **Note**: `DB_HOST`, `DB_PORT`, `REDIS_HOST`, and `REDIS_PORT` are not secrets — they are fixed topology values (`localhost` / standard ports) defined directly in the workflow `env` blocks.
 
 ---
 

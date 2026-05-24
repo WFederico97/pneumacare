@@ -1,24 +1,31 @@
-# Local database environment — PostgreSQL 15 only.
+# Local database environment — PostgreSQL 17 only.
 # Usage:
-#   cp .env.example .env   # adjust DB_NAME / DB_USER / DB_PASSWORD
-#   docker-compose up -d
+#   cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD (required — no defaults)
+#   docker compose up -d
 #
 # For the full application stack (app + kafka + redis + grafana) use compose.yaml instead.
 
 services:
   postgres:
-    image: 'postgres:15'
+    image: 'postgres:17'
     container_name: pneumacare-db
     env_file:
       - .env
     environment:
       POSTGRES_DB: ${DB_NAME:-pneumacare}
       POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+      # DB_PASSWORD has no default: Docker Compose will exit with an error if it
+      # is not set in .env, preventing the container from starting with an empty
+      # or insecure password.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env (copy .env.example)}
     ports:
-      - '5432:5432'
+      # Bind to loopback only — prevents the database from being reachable on
+      # the local network from other hosts.
+      - '127.0.0.1:5432:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Distinct volume name avoids collision with the postgres_data volume
+      # defined in compose.yaml (which runs the full application stack).
+      - postgres_data_dev:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-pneumacare}"]
       interval: 5s
@@ -28,5 +35,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_data_dev:
     driver: local
