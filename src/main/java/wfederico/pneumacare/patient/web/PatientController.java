@@ -28,7 +28,7 @@ import java.util.UUID;
  */
 @Tag(name = "Patients", description = "Patient registration and PII identity management")
 @RestController
-@RequestMapping("/api/patients")
+@RequestMapping("/api/v1/patients")
 @RequiredArgsConstructor
 public class PatientController {
 

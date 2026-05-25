@@ -72,7 +72,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAuthority("SCOPE_read")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAuthority("SCOPE_write")
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAuthority("SCOPE_write")

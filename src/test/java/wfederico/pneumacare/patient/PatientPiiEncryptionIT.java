@@ -156,11 +156,11 @@ class PatientPiiEncryptionIT {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("AC2 — GET /api/patients/{id} returns PII fields as plain text")
+    @DisplayName("AC2 — GET /api/v1/patients/{id} returns PII fields as plain text")
     void piiFieldsAreReturnedDecryptedViaApi() throws Exception {
         UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME, NATIONAL_ID);
 
-        mockMvc.perform(get("/api/patients/" + id))
+        mockMvc.perform(get("/api/v1/patients/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.firstName").value(FIRST_NAME))
                 .andExpect(jsonPath("$.data.lastName").value(LAST_NAME))
@@ -169,9 +169,9 @@ class PatientPiiEncryptionIT {
     }
 
     @Test
-    @DisplayName("AC2 — POST /api/patients response contains plain-text PII (no encrypted blobs)")
+    @DisplayName("AC2 — POST /api/v1/patients response contains plain-text PII (no encrypted blobs)")
     void postResponseContainsPlainTextPii() throws Exception {
-        mockMvc.perform(post("/api/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(FIRST_NAME, LAST_NAME, NATIONAL_ID, BIRTH_DATE)))
                 .andExpect(status().isCreated())
@@ -182,16 +182,16 @@ class PatientPiiEncryptionIT {
     }
 
     @Test
-    @DisplayName("GET /api/patients/{id} returns 404 for unknown UUID")
+    @DisplayName("GET /api/v1/patients/{id} returns 404 for unknown UUID")
     void getUnknownIdReturns404() throws Exception {
-        mockMvc.perform(get("/api/patients/" + UUID.randomUUID()))
+        mockMvc.perform(get("/api/v1/patients/" + UUID.randomUUID()))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("POST /api/patients returns 400 when required PII fields are blank")
+    @DisplayName("POST /api/v1/patients returns 400 when required PII fields are blank")
     void postWithBlankFieldsReturns400() throws Exception {
-        mockMvc.perform(post("/api/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 { "firstName": "", "lastName": "", "nationalId": "", "birthDate": "1990-05-20" }
@@ -205,7 +205,7 @@ class PatientPiiEncryptionIT {
 
     private UUID createPatientAndGetId(String firstName, String lastName, String nationalId)
             throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/patients")
+        MvcResult result = mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(firstName, lastName, nationalId, BIRTH_DATE)))
                 .andExpect(status().isCreated())
