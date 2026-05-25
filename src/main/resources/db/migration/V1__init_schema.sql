@@ -141,6 +141,7 @@ CREATE TABLE patients (
     clinical_status VARCHAR(50) NOT NULL DEFAULT 'ADMITTED',
     admission_date  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT pk_patients          PRIMARY KEY (id),
+    CONSTRAINT uq_patients_identity UNIQUE (identity_id),
     CONSTRAINT fk_patients_icu      FOREIGN KEY (icu_id)      REFERENCES intensive_care_units (id),
     CONSTRAINT fk_patients_identity FOREIGN KEY (identity_id) REFERENCES patient_identities (id),
     CONSTRAINT fk_patients_bed      FOREIGN KEY (bed_id)      REFERENCES icu_beds (id) ON DELETE SET NULL
@@ -173,6 +174,7 @@ CREATE TABLE shift_handovers (
     critical_events_summary TEXT,
     closed_at               TIMESTAMPTZ,
     CONSTRAINT pk_shift_handovers       PRIMARY KEY (id),
+    CONSTRAINT uq_shift_handovers_shift UNIQUE (shift_id),
     CONSTRAINT fk_shift_handovers_shift FOREIGN KEY (shift_id) REFERENCES medical_shifts (id)
 );
 
@@ -451,6 +453,8 @@ CREATE INDEX idx_clinical_assignments_patient ON clinical_assignments (patient_i
 CREATE INDEX idx_evaluations_patient          ON evaluations (patient_id);
 CREATE INDEX idx_evaluations_shift            ON evaluations (shift_id);
 CREATE INDEX idx_evaluations_time             ON evaluations (evaluation_time DESC);
+CREATE INDEX idx_evaluations_physical_ventilator ON evaluations (physical_ventilator_id);
+CREATE INDEX idx_evaluations_created_by       ON evaluations (created_by);
 
 -- Clinical sub-tables
 CREATE INDEX idx_sbt_patient                  ON spontaneous_breathing_trials (patient_id);

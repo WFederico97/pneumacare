@@ -228,17 +228,23 @@ audit_revisions (1)──(N) patient_identities_aud
 - An `evaluations` record **must** reference a valid `patients` row (`patient_id`). Inserting an evaluation without a valid `patient_id` raises a foreign key constraint violation (BDD Scenario 2).
 - Deleting an `icu_beds` row sets `patients.bed_id` to NULL (`ON DELETE SET NULL`) — the patient is not deleted.
 
-### Audit Tables (Hibernate Envers)
+### Audit Tables (Hibernate Envers) — Planned
 
-Three shadow tables track the full change history of sensitive entities:
+> **Status: planned — not yet active.**
+> `hibernate-envers` is not yet declared in `pom.xml` and no `@Audited` entities exist.
+> The `*_aud` tables are pre-created in `V1__init_schema.sql` so that `ddl-auto: validate`
+> in staging/prod does not fail once Envers is added. No audit writes occur until the
+> dependency and entity annotations are in place.
 
-| Shadow table             | Tracks changes to       |
+Three shadow tables are reserved to track the full change history of sensitive entities once Envers is enabled:
+
+| Shadow table             | Will track changes to   |
 |--------------------------|-------------------------|
 | `patient_identities_aud` | `patient_identities`    |
 | `patients_aud`           | `patients`              |
 | `evaluations_aud`        | `evaluations`           |
 
-`audit_revisions` is the custom `@RevisionEntity` table. Each `*_aud` row has a composite PK of `(id, rev)` and `revtype` (0=INSERT, 1=UPDATE, 2=DELETE).
+`audit_revisions` is reserved as the custom `@RevisionEntity` table. Each `*_aud` row will have a composite PK of `(id, rev)` and `revtype` (0=INSERT, 1=UPDATE, 2=DELETE).
 
 ---
 
@@ -280,5 +286,14 @@ docker compose up
 
 1. Create `src/main/resources/db/migration/V{N}__{description}.sql` where `N` is the next integer.
 2. Write idempotent DDL where possible (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
-3. Run `./mvnw verify -B` (requires Docker) — Testcontainers will apply all pending migrations against a real PostgreSQL container.
+3. Verify against a real database by starting the staging stack:
+   ```bash
+   SPRING_PROFILES_ACTIVE=staging docker compose up
+   ```
+   Then confirm the migration was applied:
+   ```bash
+   docker exec -it pneumacare-postgres psql -U $DB_USER -d $DB_NAME \
+     -c "SELECT version, description, execution_time, success FROM flyway_schema_history ORDER BY installed_rank;"
+   ```
+   > `./mvnw verify -B` does **not** exercise Flyway migrations — the current test suite has no Flyway integration test. The command compiles and runs unit tests only.
 4. Never alter or delete a migration that has already been applied in any environment.
