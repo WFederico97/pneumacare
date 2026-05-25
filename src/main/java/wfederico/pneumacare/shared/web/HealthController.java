@@ -11,7 +11,7 @@ import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 
 @Tag(name = "Health", description = "Connectivity and service health check")
 @RestController
-@RequestMapping("/api/health")
+@RequestMapping("/api/v1/health")
 public class HealthController {
 
     @Operation(summary = "Health check", description = "Returns the current health status of the service. Useful for frontend-backend connectivity verification.")

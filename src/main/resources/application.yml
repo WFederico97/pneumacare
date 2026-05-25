@@ -118,8 +118,15 @@ management:
         clinical.rsbi.calculation: true
         clinical.pafi.calculation: true
 
-# 7. Rate limiting
+# 7. Application properties
 app:
+  # AES-256-GCM key for transparent PII encryption (Law 25.326).
+  # REQUIRED — application will not start if this is missing or invalid.
+  # Set via AES_SECRET_KEY environment variable.
+  # Generate a key with: openssl rand -base64 32
+  security:
+    encryption:
+      aes-secret-key: ${AES_SECRET_KEY:}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topics:

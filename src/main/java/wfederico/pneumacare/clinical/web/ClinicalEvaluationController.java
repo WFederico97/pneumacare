@@ -20,8 +20,8 @@ import org.slf4j.MDC;
  *
  * <p>Endpoints:
  * <ul>
- *   <li>{@code POST /api/evaluations/rsbi} — Rapid Shallow Breathing Index</li>
- *   <li>{@code POST /api/evaluations/pafi} — PaO₂/FiO₂ ratio (PaFi)</li>
+ *   <li>{@code POST /api/v1/evaluations/rsbi} — Rapid Shallow Breathing Index</li>
+ *   <li>{@code POST /api/v1/evaluations/pafi} — PaO₂/FiO₂ ratio (PaFi)</li>
  * </ul>
  *
  * <p>Spring MVC's {@code ServerHttpObservationFilter} automatically creates an
@@ -34,7 +34,7 @@ import org.slf4j.MDC;
  * additionally scraped at {@code /actuator/prometheus}.
  */
 @RestController
-@RequestMapping("/api/evaluations")
+@RequestMapping("/api/v1/evaluations")
 public class ClinicalEvaluationController {
 
     private final ClinicalEvaluationService evaluationService;
@@ -48,7 +48,7 @@ public class ClinicalEvaluationController {
      *
      * <p>Example request:
      * <pre>{@code
-     * POST /api/evaluations/rsbi
+     * POST /api/v1/evaluations/rsbi
      * {
      *   "respiratoryRate": 22,
      *   "tidalVolume": 0.45
@@ -76,7 +76,7 @@ public class ClinicalEvaluationController {
      *
      * <p>Example request:
      * <pre>{@code
-     * POST /api/evaluations/pafi
+     * POST /api/v1/evaluations/pafi
      * {
      *   "pao2": 80,
      *   "fio2": 0.40
