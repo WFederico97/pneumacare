@@ -12,10 +12,11 @@ datasources:
     editable: false
     jsonData:
       derivedFields:
-        # Matches the correlation pattern logged by Spring Boot's MDC bridge:
+        # Matches the correlation pattern logged by Spring Boot's MDC bridge
+        # (logging.pattern.correlation in application.yml):
         #   [pneumacare,<traceId>,<spanId>]
         # and links the extracted traceId to the Tempo datasource.
         - name: TraceID
-          matcherRegex: '"traceId":"([a-f0-9]+)"'
+          matcherRegex: '\[pneumacare,([a-f0-9]+),[a-f0-9]+\]'
           url: "${__value.raw}"
           datasourceUid: tempo
