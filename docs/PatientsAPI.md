@@ -5,7 +5,7 @@
 <h2 local-id="5e6f7a8b9c0d">Endpoint: Register Patient</h2>
 <ul local-id="6f7a8b9c0d1e">
 <li local-id="7a8b9c0d1e2f">
-<p local-id="8b9c0d1e2f3a"><strong>URL: </strong><code>/api/v1/patients</code></p></li>
+<p local-id="8b9c0d1e2f3a"><strong>URL: </strong><code>/api/patients</code></p></li>
 <li local-id="9c0d1e2f3a4b">
 <p local-id="0d1e2f3a4b5c"><strong>METHOD: </strong><code>POST</code></p></li>
 <li local-id="1e2f3a4b5c6d">
@@ -96,7 +96,7 @@
 <h2 local-id="8f9a0b1c2d3a">Endpoint: Get Patient by ID</h2>
 <ul local-id="9a0b1c2d3e4a">
 <li local-id="0b1c2d3e4f5b">
-<p local-id="1c2d3e4f5a6a"><strong>URL: </strong><code>/api/v1/patients/{id}</code></p></li>
+<p local-id="1c2d3e4f5a6a"><strong>URL: </strong><code>/api/patients/{id}</code></p></li>
 <li local-id="2d3e4f5a6b7a">
 <p local-id="3e4f5a6b7c8a"><strong>METHOD: </strong><code>GET</code></p></li>
 <li local-id="4f5a6b7c8d9a">
@@ -115,7 +115,7 @@
 <td ac:local-id="9c0d1e2f3a4c"><p local-id="0d1e2f3a4b5b"><code>id</code></p></td>
 <td ac:local-id="1e2f3a4b5c6b"><p local-id="2f3a4b5c6d7b"><code>UUID</code></p></td>
 <td ac:local-id="3a4b5c6d7e8b"><p local-id="4b5c6d7e8f9c"><code>Yes</code></p></td>
-<td ac:local-id="5c6d7e8f9a0c"><p local-id="6d7e8f9a0b1c">The unique identifier of the patient identity record, as returned by <code>POST /api/v1/patients</code>.</p></td></tr></tbody></table>
+<td ac:local-id="5c6d7e8f9a0c"><p local-id="6d7e8f9a0b1c">The unique identifier of the patient identity record, as returned by <code>POST /api/patients</code>.</p></td></tr></tbody></table>
 
 <h2 local-id="7e8f9a0b1c2b">Payload Example (JSON):</h2>
 <p local-id="8f9a0b1c2d3b">No request body.</p>
