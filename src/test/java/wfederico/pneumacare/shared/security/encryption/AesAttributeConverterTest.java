@@ -8,6 +8,7 @@ import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link AesAttributeConverter}.
@@ -114,5 +115,25 @@ class AesAttributeConverterTest {
     @Test
     void nullEncryptedValueReturnsNull() {
         assertThat(converter.convertToEntityAttribute(null)).isNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // Corrupt / too-short payload
+    // -------------------------------------------------------------------------
+
+    @Test
+    void tooShortPayloadThrowsPiiEncryptionException() {
+        // Fewer than IV(12) + tag(16) = 28 bytes — Base64 of 10 zero bytes
+        String tooShort = Base64.getEncoder().encodeToString(new byte[10]);
+
+        assertThatThrownBy(() -> converter.convertToEntityAttribute(tooShort))
+                .isInstanceOf(PiiEncryptionException.class)
+                .hasMessageContaining("too short or corrupt");
+    }
+
+    @Test
+    void corruptBase64ThrowsPiiEncryptionException() {
+        assertThatThrownBy(() -> converter.convertToEntityAttribute("not-valid-base64!!!"))
+                .isInstanceOf(PiiEncryptionException.class);
     }
 }

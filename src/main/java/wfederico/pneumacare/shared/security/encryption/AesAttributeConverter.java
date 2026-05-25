@@ -36,8 +36,14 @@ import java.util.Base64;
  * <h3>UNIQUE constraint caveat</h3>
  * Because the IV is random, two inserts of the same plaintext produce different
  * ciphertext values. A DB-level {@code UNIQUE} constraint on an encrypted column
- * <strong>cannot</strong> detect duplicate plaintexts.
- * Uniqueness must be enforced at the application (service) layer.
+ * <strong>cannot</strong> detect duplicate plaintexts, and the constraint has
+ * been dropped from {@code national_id}.
+ * Application-layer dedup via an equality query is equally impossible — the query
+ * parameter would be re-encrypted to a fresh ciphertext, never matching stored rows.
+ * Enforcing uniqueness requires a deterministic auxiliary column (e.g., an HMAC-SHA256
+ * of the plaintext) with its own {@code UNIQUE} index.
+ * <strong>This is currently deferred</strong> — duplicate national IDs are not
+ * prevented by this implementation.
  *
  * <h3>Null handling</h3>
  * {@code null} inputs are passed through unchanged so that nullable columns work
@@ -107,7 +113,13 @@ public class AesAttributeConverter implements AttributeConverter<String, String>
             return null;
         }
         try {
-            byte[] combined   = Base64.getDecoder().decode(encryptedBase64);
+            byte[] combined = Base64.getDecoder().decode(encryptedBase64);
+            int    minLen   = IV_LENGTH_BYTES + (TAG_LENGTH_BITS / Byte.SIZE);  // 12 + 16 = 28
+            if (combined.length < minLen) {
+                throw new PiiEncryptionException(
+                        "Failed to decrypt PII field: stored value is too short or corrupt " +
+                        "(got " + combined.length + " bytes, need at least " + minLen + ")");
+            }
             byte[] iv         = Arrays.copyOfRange(combined, 0,               IV_LENGTH_BYTES);
             byte[] ciphertext = Arrays.copyOfRange(combined, IV_LENGTH_BYTES, combined.length);
 
@@ -115,6 +127,8 @@ public class AesAttributeConverter implements AttributeConverter<String, String>
             cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
 
             return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+        } catch (PiiEncryptionException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new PiiEncryptionException("Failed to decrypt PII field", ex);
         }

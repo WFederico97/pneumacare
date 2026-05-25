@@ -10,6 +10,10 @@ package wfederico.pneumacare.shared.security.encryption;
  */
 public class PiiEncryptionException extends RuntimeException {
 
+    public PiiEncryptionException(String message) {
+        super(message);
+    }
+
     public PiiEncryptionException(String message, Throwable cause) {
         super(message, cause);
     }
