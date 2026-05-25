@@ -51,14 +51,9 @@ public class ClinicalEvaluationController {
      * POST /api/evaluations/rsbi
      * {
      *   "respiratoryRate": 22,
-     *   "tidalVolume": 0.45,
-     *   "nationalId": "12345678"
+     *   "tidalVolume": 0.45
      * }
      * }</pre>
-     *
-     * <p>The {@code nationalId} field is accepted for downstream correlation but
-     * is never written to span attributes. Only the computed RSBI and its
-     * clinical interpretation appear in telemetry.
      */
     @PostMapping("/rsbi")
     public ResponseEntity<ApiResponseBase<RsbiResponse>> calculateRsbi(
@@ -84,8 +79,7 @@ public class ClinicalEvaluationController {
      * POST /api/evaluations/pafi
      * {
      *   "pao2": 80,
-     *   "fio2": 0.40,
-     *   "nationalId": "12345678"
+     *   "fio2": 0.40
      * }
      * }</pre>
      */

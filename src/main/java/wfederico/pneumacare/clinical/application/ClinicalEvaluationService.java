@@ -23,9 +23,8 @@ import wfederico.pneumacare.clinical.web.dto.RsbiResponse;
  * </ol>
  *
  * <p><b>PII policy:</b> Only derived/computed clinical values (RSBI score,
- * interpretation) are written to span attributes. Patient identifiers such as
- * {@code nationalId} are <em>never</em> written to spans. The
- * {@link wfederico.pneumacare.shared.telemetry.PiiSanitizingSpanExporter}
+ * interpretation) are written to span attributes.
+ * The {@link wfederico.pneumacare.shared.telemetry.PiiSanitizingSpanExporter}
  * provides an additional defence-in-depth layer.
  *
  * <p><b>OTel agent note:</b> This application uses
@@ -62,9 +61,6 @@ public class ClinicalEvaluationService {
         current.setAttribute("clinical.rsbi.interpretation",  interpretation);
         current.setAttribute("clinical.rsbi.respiratory_rate", req.respiratoryRate());
         current.setAttribute("clinical.rsbi.tidal_volume",    req.tidalVolume());
-        // NOTE: req.nationalId() is intentionally NOT added here. Adding PII to
-        // span attributes would violate Law 25.326. The PiiSanitizingSpanExporter
-        // is a safety net, but the primary control is not writing PII in the first place.
 
         return new RsbiResponse(rsbi, interpretation);
     }

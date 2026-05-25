@@ -11,9 +11,6 @@ import jakarta.validation.constraints.Positive;
  * <p>PaFi = PaO₂ (mmHg) / FiO₂ (fraction)
  *
  * <p>Used for ARDS severity classification per the Berlin criteria.
- *
- * <p><b>PII note:</b> {@code nationalId} is accepted for correlation but is
- * never written to span attributes or metric tags.
  */
 public record PafiRequest(
 
@@ -30,12 +27,6 @@ public record PafiRequest(
         @NotNull
         @DecimalMin("0.21")
         @DecimalMax("1.0")
-        Double fio2,
-
-        /**
-         * Optional patient national identity document — used only for
-         * correlation in the response. <strong>Must not be propagated to
-         * telemetry attributes.</strong>
-         */
-        String nationalId
+        Double fio2
 ) {}
+
