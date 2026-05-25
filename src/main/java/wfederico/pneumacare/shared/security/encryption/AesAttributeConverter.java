@@ -18,13 +18,13 @@ import java.util.Base64;
  * JPA {@link AttributeConverter} that transparently encrypts and decrypts PII
  * {@link String} fields using <strong>AES-256-GCM</strong>.
  *
- * <h3>Storage format</h3>
+ * <h2>Storage format</h2>
  * <pre>Base64( IV[12 bytes] || AES-GCM-Ciphertext+AuthTag )</pre>
  * The 12-byte IV is randomly generated on every write and prepended to the ciphertext.
  * The result is Base64-encoded to a printable string safe for {@code VARCHAR} / {@code TEXT}
  * columns.
  *
- * <h3>Security properties</h3>
+ * <h2>Security properties</h2>
  * <ul>
  *   <li>AES-256 — 256-bit key loaded from {@link AesEncryptionConfig}</li>
  *   <li>GCM mode — authenticated encryption; detects ciphertext tampering</li>
@@ -33,7 +33,7 @@ import java.util.Base64;
  *       (non-deterministic / IND-CPA secure)</li>
  * </ul>
  *
- * <h3>UNIQUE constraint caveat</h3>
+ * <h2>UNIQUE constraint caveat</h2>
  * Because the IV is random, two inserts of the same plaintext produce different
  * ciphertext values. A DB-level {@code UNIQUE} constraint on an encrypted column
  * <strong>cannot</strong> detect duplicate plaintexts, and the constraint has
@@ -45,7 +45,7 @@ import java.util.Base64;
  * <strong>This is currently deferred</strong> — duplicate national IDs are not
  * prevented by this implementation.
  *
- * <h3>Null handling</h3>
+ * <h2>Null handling</h2>
  * {@code null} inputs are passed through unchanged so that nullable columns work
  * without special casing in the entity.
  *

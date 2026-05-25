@@ -27,7 +27,7 @@ import java.util.UUID;
  * AES-256-GCM encryption and decryption are handled transparently by the
  * JPA persistence layer.
  *
- * <h3>Security note</h3>
+ * <h2>Security note</h2>
  * In {@code staging}/{@code prod} profiles these endpoints require OAuth2 scopes:
  * {@code SCOPE_write} for {@code POST}, {@code SCOPE_read} for {@code GET}.
  */
