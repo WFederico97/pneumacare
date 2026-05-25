@@ -105,6 +105,13 @@ management:
         step: 10s
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        # Log records are collected by the OpenTelemetry Logback appender
+        # (logback-spring.xml) and exported here in batches.
+        # The grafana/otel-lgtm collector receives them and pushes to Loki.
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/logs
+        step: 10s
   tracing:
     sampling:
       probability: 1.0

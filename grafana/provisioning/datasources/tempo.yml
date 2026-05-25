@@ -41,8 +41,12 @@ datasources:
         spanStartTimeShift: "-1m"
         spanEndTimeShift: "1m"
         tags:
+          # Maps the OTel resource attribute "service.name" to the Loki label
+          # "service_name" (dots are normalised to underscores by the OTel
+          # Collector's Loki exporter).  This produces the query:
+          #   {service_name="pneumacare"}
           - key: service.name
-            value: job
+            value: service_name
         lokiSearch: true
         filterByTraceID: true
         filterBySpanID: false

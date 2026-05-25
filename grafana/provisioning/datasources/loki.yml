@@ -12,11 +12,14 @@ datasources:
     editable: false
     jsonData:
       derivedFields:
-        # Matches the correlation pattern logged by Spring Boot's MDC bridge
-        # (logging.pattern.correlation in application.yml):
-        #   [pneumacare,<traceId>,<spanId>]
-        # and links the extracted traceId to the Tempo datasource.
+        # Matches the OTel "traceId" label attached to every log record by the
+        # OpenTelemetry Logback appender (via captureMdcAttributes in
+        # logback-spring.xml).  When the otel-lgtm collector pushes log records
+        # to Loki it stores MDC/OTel log attributes as Loki labels, so we use
+        # matcherType: label to look up the label by name rather than scanning
+        # the log line body with a regex.
         - name: TraceID
-          matcherRegex: '\[pneumacare,([a-f0-9]+),[a-f0-9]+\]'
+          matcherType: label
+          matcherRegex: traceId
           url: "${__value.raw}"
           datasourceUid: tempo
