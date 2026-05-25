@@ -91,20 +91,30 @@ public final class PiiSanitizingSpanExporter implements SpanExporter {
     }
 
     private Attributes sanitizeAttributes(Attributes original) {
-        boolean[] modified = {false};
-        AttributesBuilder builder = Attributes.builder();
+        // Fast path: scan for any sensitive key without allocating a builder.
+        // The vast majority of spans carry no PII, so this avoids per-span
+        // allocation and attribute copying on the hot export path.
+        boolean[] hasSensitive = {false};
+        original.forEach((key, value) -> {
+            if (!hasSensitive[0] && isSensitive(key.getKey())) {
+                hasSensitive[0] = true;
+            }
+        });
+        if (!hasSensitive[0]) {
+            return original;
+        }
 
+        // Slow path: at least one sensitive key found — copy with redaction.
+        AttributesBuilder builder = Attributes.builder();
         original.forEach((key, value) -> {
             if (isSensitive(key.getKey())) {
                 log.debug("PII sanitizer: redacting span attribute '{}'", key.getKey());
                 builder.put(AttributeKey.stringKey(key.getKey()), REDACTED_VALUE);
-                modified[0] = true;
             } else {
                 copyAttribute(builder, key, value);
             }
         });
-
-        return modified[0] ? builder.build() : original;
+        return builder.build();
     }
 
     /** Returns {@code true} if the key name contains a known PII substring (case-insensitive). */
