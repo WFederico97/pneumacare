@@ -24,6 +24,9 @@ spring:
   # Flyway (disabled by default in dev; enabled in staging/prod profiles)
   flyway:
     enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
 
   # 2. Redis config
   data:

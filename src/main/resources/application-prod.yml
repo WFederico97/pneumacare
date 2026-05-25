@@ -10,6 +10,8 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+    connect-retries: 3
+    connect-retries-interval: 2
 
 management:
   tracing:
