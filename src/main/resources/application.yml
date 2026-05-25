@@ -95,6 +95,9 @@ management:
   otlp:
     metrics:
       export:
+        # Metrics are accumulated over `step` and sent as a single batch request.
+        # This is non-blocking (sent on a background thread) and adds zero latency
+        # to clinical calculations or any other business operations.
         url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
         step: 10s
     tracing:
@@ -102,6 +105,15 @@ management:
   tracing:
     sampling:
       probability: 1.0
+  metrics:
+    distribution:
+      # Publish full histogram buckets (not just count+sum) for these timers.
+      # Required for histogram_quantile() PromQL expressions (p50, p95, p99).
+      # Enabled selectively to avoid cardinality explosion on high-label metrics.
+      percentiles-histogram:
+        http.server.requests: true
+        clinical.rsbi.calculation: true
+        clinical.pafi.calculation: true
 
 # 7. Rate limiting
 app:

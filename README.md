@@ -297,10 +297,10 @@ Two Compose files are provided:
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | **Database only** — PostgreSQL 17 on port 5432 (localhost-bound). Use this for local development when you only need the database. |
+| `docker-compose.dev.yml` | **Database only** — PostgreSQL 17 on port 5432 (localhost-bound). Use this for local development when you only need the database. |
 | `compose.yaml` | **Full stack** — all services (app, PostgreSQL 17, Redis, Kafka, Grafana LGTM). |
 
-### `docker-compose.yml` services
+### `docker-compose.dev.yml` services
 
 | Service | Image | Port | Volume |
 |---|---|---|---|
@@ -308,7 +308,7 @@ Two Compose files are provided:
 
 ```bash
 cp .env.example .env   # set DB_NAME / DB_USER / DB_PASSWORD (required — no insecure defaults)
-docker compose up -d   # AC1: PostgreSQL 17 listening on 127.0.0.1:5432
+docker compose -f docker-compose.dev.yml up -d   # AC1: PostgreSQL 17 listening on 127.0.0.1:5432
 ```
 
 ### `compose.yaml` services
