@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * <p>Active only when {@code app.kafka.enabled=true}. When disabled,
  * {@link ApplicationEventPublisherAdapter} is used as an in-process fallback.
  *
- * <h3>Topic naming convention</h3>
+ * <h2>Topic naming convention</h2>
  * The topic is derived from the event class name:
  * <ol>
  *   <li>Strip trailing {@code Event} suffix (if present)</li>
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  *   <li>{@code AssessmentCompleted}  → {@code pneumacare.events.assessment-completed}</li>
  * </ul>
  *
- * <h3>Error handling</h3>
+ * <h2>Error handling</h2>
  * Send failures are logged but do not propagate synchronously; the Kafka producer's
  * internal retry and the DLT recoverer in {@link wfederico.pneumacare.shared.config.KafkaConfig}
  * handle retries on the consumer side.

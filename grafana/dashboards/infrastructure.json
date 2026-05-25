@@ -1,0 +1,214 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "HikariCP — Active / Idle / Max Connections",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "hikaricp_connections_active{job=\"pneumacare\"}",
+          "legendFormat": "Active",
+          "refId": "A"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "hikaricp_connections_idle{job=\"pneumacare\"}",
+          "legendFormat": "Idle",
+          "refId": "B"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "hikaricp_connections_max{job=\"pneumacare\"}",
+          "legendFormat": "Max",
+          "refId": "C"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "hikaricp_connections_pending{job=\"pneumacare\"}",
+          "legendFormat": "Pending",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HikariCP — Connection Acquire Latency (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_acquire_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p95 acquire",
+          "refId": "A"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum(rate(hikaricp_connections_acquire_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p50 acquire",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HikariCP — Connection Usage Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_usage_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p95 usage",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "HikariCP — Connection Creation Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(hikaricp_connections_creation_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p95 creation",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Spring Data Repository — Invocation Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(spring_data_repository_invocations_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, repository))",
+          "legendFormat": "p95 {{repository}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Redis (Lettuce) — Command Completion Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "sum(rate(lettuce_command_completion_milliseconds_count{job=\"pneumacare\"}[1m])) by (command)",
+          "legendFormat": "{{command}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Redis (Lettuce) — Command Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(lettuce_command_completion_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le, command))",
+          "legendFormat": "p95 {{command}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Producer — Send Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_template_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p95 produce",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Consumer — Listener Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(spring_kafka_listener_milliseconds_bucket{job=\"pneumacare\"}[1m])) by (le))",
+          "legendFormat": "p95 consume",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Consumer — Lag (records behind)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "sum(kafka_consumer_records_lag{job=\"pneumacare\"}) by (topic, partition)",
+          "legendFormat": "{{topic}}[{{partition}}]",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["infrastructure", "database", "redis", "kafka"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pneumacare — Infrastructure",
+  "uid": "pneumacare-infra",
+  "version": 1
+}

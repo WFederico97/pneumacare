@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!--
+        Provides CONSOLE_LOG_PATTERN (which includes ${LOG_CORRELATION_PATTERN}
+        from application.yml → logging.pattern.correlation), common log levels,
+        and shared formatting properties.
+    -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!--
+        Standard Spring Boot coloured console appender.
+        Outputs: [pneumacare,<traceId>,<spanId>] level  logger  - message
+    -->
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!--
+        OpenTelemetry Logback bridge.
+        Forwards every LoggingEvent to the OTel Logs SDK, which exports them
+        via OTLP HTTP to the /v1/logs endpoint configured in application.yml
+        (management.otlp.logging.export.url).  The grafana/otel-lgtm collector
+        receives these records and pushes them into Loki.
+
+        captureCodeAttributes  – attaches logger name, source file and line number
+                                 to every log record.
+        captureMdcAttributes   – forwards traceId and spanId (populated by the
+                                 Spring Boot / Micrometer tracing bridge) so that
+                                 Loki can link a log line back to its Tempo trace.
+    -->
+    <appender name="OpenTelemetry"
+              class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <captureCodeAttributes>true</captureCodeAttributes>
+        <captureMdcAttributes>traceId,spanId</captureMdcAttributes>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OpenTelemetry"/>
+    </root>
+
+</configuration>

@@ -11,13 +11,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Ephemeral CI credentials defined once at job level.
+    # Secrets take precedence when configured; fallback values keep the workflow
+    # green for forked PRs where secrets are not injected by GitHub.
+    # All steps in this job inherit these variables automatically.
+    env:
+      DB_NAME: ${{ secrets.DB_NAME || 'pneumacare_ci' }}
+      DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci_postgres_pw' }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: dev
+
     services:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: mi_base_de_datos
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: admin
+          # GitHub Actions does not expose the job-level `env` context inside
+          # service-container configuration blocks, so the fallback expressions
+          # must be repeated here verbatim to stay in sync with the job env above.
+          POSTGRES_DB: ${{ secrets.DB_NAME || 'pneumacare_ci' }}
+          POSTGRES_USER: ${{ secrets.DB_USER || 'postgres' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'ci_postgres_pw' }}
         ports:
           - 5432:5432
         options: >-
@@ -30,6 +47,11 @@ jobs:
         image: redis:7.4
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -45,15 +67,8 @@ jobs:
         run: chmod +x ./mvnw
 
       - name: Build and test
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: mi_base_de_datos
-          DB_USER: postgres
-          DB_PASSWORD: admin
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          SPRING_PROFILES_ACTIVE: dev
+        # DB_NAME / DB_USER / DB_PASSWORD / DB_HOST / DB_PORT / REDIS_* /
+        # SPRING_PROFILES_ACTIVE are inherited from the job-level env block above.
         run: ./mvnw verify -B
 
       - name: Publish test results

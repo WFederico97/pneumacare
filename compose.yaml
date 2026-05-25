@@ -57,6 +57,17 @@ services:
   grafana-lgtm:
     image: 'grafana/otel-lgtm:0.9.1'
     container_name: pneumacare-grafana
+    environment:
+      # Grafana admin credentials — injected via .env (see .env.example).
+      # The grafana/otel-lgtm image respects standard GF_* env vars.
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD must be set}
+      # Disable anonymous access — all users must authenticate.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Datasource provisioning: grafana/otel-lgtm pre-configures Prometheus/Mimir,
+      # Tempo, and Loki internally. The override file adds trace-to-metrics linking
+      # and service-map features on top of the built-in Tempo datasource.
+      GF_PATHS_PROVISIONING: /otel-lgtm/grafana/conf/provisioning
     ports:
       - '3000:3000'
       - '4317:4317'
@@ -64,6 +75,7 @@ services:
     volumes:
       - ./grafana/provisioning-dashboards.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yml
       - ./grafana/dashboards:/var/lib/grafana/dashboards/custom
+      - ./grafana/provisioning/datasources:/otel-lgtm/grafana/conf/provisioning/datasources
 
   kafka:
     image: 'apache/kafka:3.9.2'
@@ -91,6 +103,26 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  frontend:
+    build: ../pneumacare-frontend
+    container_name: pneumacare-frontend
+    ports:
+      - '${FRONTEND_PORT:-4200}:80'
+    environment:
+      # "app" is the backend service name — reachable within this Compose network.
+      BACKEND_HOST: app
+      BACKEND_PORT: 8080
+      OAUTH2_ISSUER_URI: ${OAUTH2_ISSUER_URI:-http://localhost:9000}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   postgres_data:

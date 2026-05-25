@@ -7,4 +7,5 @@ public final class RequestMessageConstants {
     public static final  String PLAYER_UPDATED = "Jugador actualizado con exito";
     public static final  String PLAYER_DELETED = "Jugador eliminado con exito";
     public static final  String PLAYER_PATCHED = "Jugador actualizado parcialmente con exito";
+    public static final  String HEALTH_OK = "El servicio esta operativo";
 }

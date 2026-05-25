@@ -24,6 +24,9 @@ spring:
   # Flyway (disabled by default in dev; enabled in staging/prod profiles)
   flyway:
     enabled: false
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+    validate-on-migrate: true
 
   # 2. Redis config
   data:
@@ -64,6 +67,11 @@ spring:
 # microservice configuration port
 server:
   port: ${APP_PORT:8080}
+  # Trust X-Forwarded-For / X-Real-IP headers from the nginx reverse proxy so
+  # that SecurityFilter.getRemoteAddr() resolves to the real client IP instead
+  # of nginx's container IP, preserving Redis-based per-IP rate-limiting and
+  # blacklisting. Tomcat's RemoteIpValve handles the actual header processing.
+  forward-headers-strategy: native
 
 # 5. Swagger / OpenAPI configuration
 springdoc:
@@ -90,16 +98,42 @@ management:
   otlp:
     metrics:
       export:
+        # Metrics are accumulated over `step` and sent as a single batch request.
+        # This is non-blocking (sent on a background thread) and adds zero latency
+        # to clinical calculations or any other business operations.
         url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
         step: 10s
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        # Log records are collected by the OpenTelemetry Logback appender
+        # (logback-spring.xml) and exported here in batches.
+        # The grafana/otel-lgtm collector receives them and pushes to Loki.
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/logs
+        step: 10s
   tracing:
     sampling:
       probability: 1.0
+  metrics:
+    distribution:
+      # Publish full histogram buckets (not just count+sum) for these timers.
+      # Required for histogram_quantile() PromQL expressions (p50, p95, p99).
+      # Enabled selectively to avoid cardinality explosion on high-label metrics.
+      percentiles-histogram:
+        http.server.requests: true
+        clinical.rsbi.calculation: true
+        clinical.pafi.calculation: true
 
-# 7. Rate limiting
+# 7. Application properties
 app:
+  # AES-256-GCM key for transparent PII encryption (Law 25.326).
+  # REQUIRED — application will not start if this is missing or invalid.
+  # Set via AES_SECRET_KEY environment variable.
+  # Generate a key with: openssl rand -base64 32
+  security:
+    encryption:
+      aes-secret-key: ${AES_SECRET_KEY:}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topics:
