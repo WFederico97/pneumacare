@@ -10,7 +10,7 @@ import java.util.Base64;
 /**
  * Provides the AES-256 {@link SecretKeySpec} bean used by {@link AesAttributeConverter}.
  *
- * <h3>Fail-fast security check</h3>
+ * <h2>Fail-fast security check</h2>
  * This configuration bean validates the AES key at Spring context startup.
  * The application will <strong>refuse to start</strong> with a clear
  * {@link IllegalStateException} if the key is:

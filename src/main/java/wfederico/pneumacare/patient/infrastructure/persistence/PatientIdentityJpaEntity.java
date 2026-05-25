@@ -16,13 +16,13 @@ import java.util.UUID;
  * Hibernate stores Base64-encoded AES-256-GCM ciphertext in the database and
  * returns plain text to the application — callers see no difference.
  *
- * <h3>PII isolation</h3>
+ * <h2>PII isolation</h2>
  * This entity is intentionally isolated from clinical data. All clinical tables
  * ({@code evaluations}, {@code airway_assessments}, etc.) reference
  * {@code patients.id}, never this table directly. This limits the blast radius
  * of a database breach and simplifies GDPR/Law-25.326 data-subject requests.
  *
- * <h3>UNIQUE constraint on nationalId</h3>
+ * <h2>UNIQUE constraint on nationalId</h2>
  * AES-GCM uses a random IV per write, so the same DNI/CUIL encrypts to a
  * different ciphertext on every INSERT. The DB-level {@code UNIQUE} constraint
  * was dropped in {@code V2__encrypt_patient_identity_columns.sql}.
