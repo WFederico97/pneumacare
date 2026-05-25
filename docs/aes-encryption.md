@@ -168,9 +168,11 @@ Because the IV is random, two inserts of the same `national_id` produce differen
 ciphertext values. A DB-level `UNIQUE` constraint cannot detect duplicate plaintexts
 and was therefore dropped in `V2__encrypt_patient_identity_columns.sql`.
 
-**Application-layer uniqueness** must be enforced by the service before inserting
-a new record. A future migration may introduce a separate `national_id_hash` column
-(HMAC-SHA256) for efficient DB-level deduplication.
+Application-layer dedup via equality query is equally impossible — the query parameter
+would be re-encrypted to a new ciphertext, never matching stored rows.
+A future migration will introduce a `national_id_hash` column (HMAC-SHA256) with a
+`UNIQUE` index for reliable deduplication. Duplicate national IDs are not prevented
+by the current implementation.
 
 ---
 
