@@ -1,6 +1,7 @@
 package wfederico.pneumacare.patient;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import wfederico.pneumacare.TestcontainersConfiguration;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifierTypeJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifierTypeRepository;
 
 import java.util.Base64;
 import java.util.Map;
@@ -37,7 +40,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <h3>Acceptance criteria covered</h3>
  * <ul>
- *   <li><strong>AC1</strong> — PII fields stored as encrypted Base64 in the DB</li>
+ *   <li><strong>AC1</strong> — PII fields stored as encrypted Base64 in the DB
+ *       (covers both {@code patient_identities} name fields and
+ *       {@code patient_identifiers.patient_identifier_name})</li>
  *   <li><strong>AC2</strong> — PII fields returned as plain text via the REST API</li>
  *   <li><strong>AC3</strong> — Startup validation covered by {@code AesEncryptionConfigTest}</li>
  * </ul>
@@ -84,21 +89,46 @@ class PatientPiiEncryptionIT {
     @Autowired
     private ObjectMapper objectMapper;  // tools.jackson.databind.ObjectMapper
 
-    private static final String FIRST_NAME  = "Juan";
-    private static final String LAST_NAME   = "Pérez";
-    private static final String NATIONAL_ID = "12345678";
-    private static final String BIRTH_DATE  = "1990-05-20";
+    @Autowired
+    private PatientIdentifierTypeRepository identifierTypeRepository;
 
-    private static String requestBody(String firstName, String lastName,
-                                       String nationalId, String birthDate) {
+    private static final String FIRST_NAME       = "Juan";
+    private static final String LAST_NAME        = "Pérez";
+    private static final String BIRTH_DATE       = "1990-05-20";
+    private static final String IDENTIFIER_VALUE = "12345678";
+
+    /** Primary key of the DNI type row created in {@link #seedIdentifierType()}. */
+    private int dniTypeId;
+
+    /**
+     * Ensures a "DNI" identifier type exists before each test.
+     * Reuses an existing row if the type was already seeded by a previous test
+     * in the same Spring context.
+     */
+    @BeforeEach
+    void seedIdentifierType() {
+        PatientIdentifierTypeJpaEntity dniType = identifierTypeRepository.findAll().stream()
+                .filter(t -> "DNI".equals(t.getPatientIdentifierTypeName()))
+                .findFirst()
+                .orElseGet(() -> identifierTypeRepository.save(
+                        PatientIdentifierTypeJpaEntity.builder()
+                                .patientIdentifierTypeName("DNI")
+                                .patientIdentifierTypeDescription("Documento Nacional de Identidad")
+                                .build()));
+        dniTypeId = dniType.getPatientIdentifierTypeId();
+    }
+
+    private String requestBody(String firstName, String lastName, String birthDate) {
         return """
                 {
-                    "firstName":  "%s",
-                    "lastName":   "%s",
-                    "nationalId": "%s",
-                    "birthDate":  "%s"
+                    "firstName":   "%s",
+                    "lastName":    "%s",
+                    "birthDate":   "%s",
+                    "identifiers": [
+                        { "identifierTypeId": %d, "value": "%s" }
+                    ]
                 }
-                """.formatted(firstName, lastName, nationalId, birthDate);
+                """.formatted(firstName, lastName, birthDate, dniTypeId, IDENTIFIER_VALUE);
     }
 
     // -------------------------------------------------------------------------
@@ -106,41 +136,59 @@ class PatientPiiEncryptionIT {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("AC1 — PII fields are stored as AES-256-GCM encrypted Base64 in the database")
+    @DisplayName("AC1 — Name fields are stored as AES-256-GCM encrypted Base64 in patient_identities")
     void piiFieldsAreStoredEncryptedInDatabase() throws Exception {
-        UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME, NATIONAL_ID);
+        UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME);
 
         // Query raw column values — bypasses the JPA AttributeConverter
         Map<String, Object> rawRow = jdbcTemplate.queryForMap(
-                "SELECT first_name, last_name, national_id FROM patient_identities WHERE id = ?",
+                "SELECT first_name, last_name FROM patient_identities WHERE id = ?",
                 id);
 
-        String rawFirstName  = (String) rawRow.get("first_name");
-        String rawLastName   = (String) rawRow.get("last_name");
-        String rawNationalId = (String) rawRow.get("national_id");
+        String rawFirstName = (String) rawRow.get("first_name");
+        String rawLastName  = (String) rawRow.get("last_name");
 
         // Must not equal plaintext
         assertThat(rawFirstName).isNotEqualTo(FIRST_NAME);
         assertThat(rawLastName).isNotEqualTo(LAST_NAME);
-        assertThat(rawNationalId).isNotEqualTo(NATIONAL_ID);
 
         // Must be valid Base64
         assertThatCode(() -> Base64.getDecoder().decode(rawFirstName)).doesNotThrowAnyException();
         assertThatCode(() -> Base64.getDecoder().decode(rawLastName)).doesNotThrowAnyException();
-        assertThatCode(() -> Base64.getDecoder().decode(rawNationalId)).doesNotThrowAnyException();
 
         // Decoded bytes must be larger than plaintext (IV + ciphertext + auth-tag)
         assertThat(Base64.getDecoder().decode(rawFirstName).length)
                 .isGreaterThan(FIRST_NAME.getBytes().length);
-        assertThat(Base64.getDecoder().decode(rawNationalId).length)
-                .isGreaterThan(NATIONAL_ID.getBytes().length);
+        assertThat(Base64.getDecoder().decode(rawLastName).length)
+                .isGreaterThan(LAST_NAME.getBytes().length);
+    }
+
+    @Test
+    @DisplayName("AC1 — Identifier value is stored as AES-256-GCM encrypted Base64 in patient_identifiers")
+    void identifierValueIsStoredEncryptedInDatabase() throws Exception {
+        UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME);
+
+        // Query the raw identifier value — bypasses the JPA AttributeConverter
+        String rawIdentifierName = (String) jdbcTemplate.queryForMap(
+                "SELECT patient_identifier_name FROM patient_identifiers WHERE patient_identity_id = ?",
+                id).get("patient_identifier_name");
+
+        // Must not equal plaintext
+        assertThat(rawIdentifierName).isNotEqualTo(IDENTIFIER_VALUE);
+
+        // Must be valid Base64
+        assertThatCode(() -> Base64.getDecoder().decode(rawIdentifierName)).doesNotThrowAnyException();
+
+        // Decoded bytes must be larger than plaintext (IV + ciphertext + auth-tag)
+        assertThat(Base64.getDecoder().decode(rawIdentifierName).length)
+                .isGreaterThan(IDENTIFIER_VALUE.getBytes().length);
     }
 
     @Test
     @DisplayName("AC1 — Same plaintext produces different ciphertext on each insert (random IV)")
     void sameNameEncryptsDifferentlyOnEachInsert() throws Exception {
-        UUID id1 = createPatientAndGetId(FIRST_NAME, LAST_NAME, "11111111");
-        UUID id2 = createPatientAndGetId(FIRST_NAME, LAST_NAME, "22222222");
+        UUID id1 = createPatientAndGetId(FIRST_NAME, LAST_NAME);
+        UUID id2 = createPatientAndGetId(FIRST_NAME, LAST_NAME);
 
         String enc1 = (String) jdbcTemplate.queryForMap(
                 "SELECT first_name FROM patient_identities WHERE id = ?", id1).get("first_name");
@@ -158,14 +206,15 @@ class PatientPiiEncryptionIT {
     @Test
     @DisplayName("AC2 — GET /api/v1/patients/{id} returns PII fields as plain text")
     void piiFieldsAreReturnedDecryptedViaApi() throws Exception {
-        UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME, NATIONAL_ID);
+        UUID id = createPatientAndGetId(FIRST_NAME, LAST_NAME);
 
         mockMvc.perform(get("/api/v1/patients/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.firstName").value(FIRST_NAME))
                 .andExpect(jsonPath("$.data.lastName").value(LAST_NAME))
-                .andExpect(jsonPath("$.data.nationalId").value(NATIONAL_ID))
-                .andExpect(jsonPath("$.data.birthDate").value(BIRTH_DATE));
+                .andExpect(jsonPath("$.data.birthDate").value(BIRTH_DATE))
+                .andExpect(jsonPath("$.data.identifiers[0].typeName").value("DNI"))
+                .andExpect(jsonPath("$.data.identifiers[0].value").value(IDENTIFIER_VALUE));
     }
 
     @Test
@@ -173,11 +222,12 @@ class PatientPiiEncryptionIT {
     void postResponseContainsPlainTextPii() throws Exception {
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody(FIRST_NAME, LAST_NAME, NATIONAL_ID, BIRTH_DATE)))
+                        .content(requestBody(FIRST_NAME, LAST_NAME, BIRTH_DATE)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.firstName").value(FIRST_NAME))
                 .andExpect(jsonPath("$.data.lastName").value(LAST_NAME))
-                .andExpect(jsonPath("$.data.nationalId").value(NATIONAL_ID))
+                .andExpect(jsonPath("$.data.identifiers[0].typeName").value("DNI"))
+                .andExpect(jsonPath("$.data.identifiers[0].value").value(IDENTIFIER_VALUE))
                 .andExpect(jsonPath("$.data.id").isNotEmpty());
     }
 
@@ -194,7 +244,31 @@ class PatientPiiEncryptionIT {
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "firstName": "", "lastName": "", "nationalId": "", "birthDate": "1990-05-20" }
+                                { "firstName": "", "lastName": "", "birthDate": "1990-05-20",
+                                  "identifiers": [{ "identifierTypeId": %d, "value": "x" }] }
+                                """.formatted(dniTypeId)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/patients returns 400 when identifiers list is missing")
+    void postWithMissingIdentifiersReturns400() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "Juan", "lastName": "Pérez", "birthDate": "1990-05-20" }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/patients returns 400 when identifier type does not exist")
+    void postWithUnknownIdentifierTypeReturns400() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                { "firstName": "Juan", "lastName": "Pérez", "birthDate": "1990-05-20",
+                                  "identifiers": [{ "identifierTypeId": 99999, "value": "12345678" }] }
                                 """))
                 .andExpect(status().isBadRequest());
     }
@@ -203,16 +277,15 @@ class PatientPiiEncryptionIT {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private UUID createPatientAndGetId(String firstName, String lastName, String nationalId)
-            throws Exception {
+    private UUID createPatientAndGetId(String firstName, String lastName) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody(firstName, lastName, nationalId, BIRTH_DATE)))
+                        .content(requestBody(firstName, lastName, BIRTH_DATE)))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         String body = result.getResponse().getContentAsString();
         JsonNode data = objectMapper.readTree(body).path("data");
-        return UUID.fromString(data.path("id").asText());
+        return UUID.fromString(data.path("id").asString());
     }
 }
