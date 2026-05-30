@@ -1,10 +1,15 @@
 package wfederico.pneumacare.patient.web;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,8 +41,38 @@ public class IdentifierTypeController {
 
     @Operation(
             summary = "List all identifier types",
-            description = "Returns the full catalog of patient identifier types, ordered by insertion order. "
-                        + "Used to populate the identifier type dropdown on the patient registration form.")
+            description = """
+                    Returns the full catalog of patient identifier types, ordered by insertion order \
+                    (DNI first, then CUIL, CUIT, LE, LC, Pasaporte).
+
+                    Use the `id` field of each entry as the `identifierTypeId` value when calling \
+                    `POST /api/v1/patients`.
+
+                    No authentication scope is required for this endpoint.
+                    """)
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Catalog retrieved successfully.",
+                    content = @Content(
+                            mediaType = MediaType.APPLICATION_JSON_VALUE,
+                            examples = @ExampleObject(
+                                    value = """
+                                            {
+                                              "status": 200,
+                                              "message": "Identifier types retrieved successfully",
+                                              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+                                              "data": [
+                                                { "id": 1, "name": "DNI",       "description": "Documento Nacional de Identidad" },
+                                                { "id": 2, "name": "CUIL",      "description": "Código Único de Identificación Laboral" },
+                                                { "id": 3, "name": "CUIT",      "description": "Código Único de Identificación Tributaria" },
+                                                { "id": 4, "name": "LE",        "description": "Libreta de Enrolamiento" },
+                                                { "id": 5, "name": "LC",        "description": "Libreta Cívica" },
+                                                { "id": 6, "name": "Pasaporte", "description": "Pasaporte" }
+                                              ]
+                                            }
+                                            """)))
+    })
     @GetMapping
     public ResponseEntity<ApiResponseBase<List<IdentifierTypeResponse>>> listIdentifierTypes() {
         List<IdentifierTypeResponse> data = service.findAll();
