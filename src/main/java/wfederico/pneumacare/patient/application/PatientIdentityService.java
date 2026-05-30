@@ -10,9 +10,12 @@ import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifier
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityRepository;
 import wfederico.pneumacare.patient.web.dto.CreatePatientRequest;
+import wfederico.pneumacare.patient.web.dto.PatientIdentifierRequest;
 import wfederico.pneumacare.patient.web.dto.PatientResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -39,10 +42,21 @@ public class PatientIdentityService {
      *
      * @param request plain-text patient identity data including at least one identifier
      * @return the created record with plain-text PII (decrypted by JPA on read-back)
-     * @throws BusinessLayerException with {@code 400} if any {@code identifierTypeId} is unknown
+     * @throws BusinessLayerException with {@code 400} if the request contains duplicate
+     *         identifier type IDs, or if any {@code identifierTypeId} is unknown
      */
     @Transactional
     public PatientResponse create(CreatePatientRequest request) {
+        // Guard: reject duplicate identifier types within the same request
+        Set<Integer> seenTypeIds = new HashSet<>();
+        for (PatientIdentifierRequest req : request.identifiers()) {
+            if (!seenTypeIds.add(req.identifierTypeId())) {
+                throw new BusinessLayerException(
+                        "Duplicate identifier type in request: " + req.identifierTypeId(),
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
         PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
                 .firstName(request.firstName())
                 .lastName(request.lastName())
