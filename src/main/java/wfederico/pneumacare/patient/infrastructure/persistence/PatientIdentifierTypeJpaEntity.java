@@ -20,13 +20,14 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class PatientIdentifierTypeJpaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "patient_identifier_type_id", updatable = false, nullable = false)
-    private int patientIdentifierTypeId;
+    private Integer patientIdentifierTypeId;
 
     @Column(name = "patient_identifier_type_name", nullable = false)
     private String patientIdentifierTypeName;
@@ -34,6 +35,12 @@ public class PatientIdentifierTypeJpaEntity {
     @Column(name = "patient_identifier_type_description")
     private String patientIdentifierTypeDescription;
 
-    @OneToMany(mappedBy = "patientIdentifierType", cascade = CascadeType.ALL, orphanRemoval = false)
+    /**
+     * Inverse side of the catalog → data relationship. Read-only: the catalog
+     * must never cascade mutations into identifier (PII) rows.
+     * Excluded from {@code toString()} to avoid triggering lazy loads in logs.
+     */
+    @ToString.Exclude
+    @OneToMany(mappedBy = "patientIdentifierType")
     private List<PatientIdentifierJpaEntity> patientIdentifiers;
 }

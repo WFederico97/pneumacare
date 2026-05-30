@@ -29,6 +29,7 @@ import wfederico.pneumacare.shared.security.encryption.AesAttributeConverter;
 @Getter
 @Setter
 @Builder
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class PatientIdentifierJpaEntity {
@@ -36,7 +37,7 @@ public class PatientIdentifierJpaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "patient_identifier_id", updatable = false, nullable = false)
-    private int patientIdentifierId;
+    private Integer patientIdentifierId;
 
     /**
      * [PII] The raw identifier value (e.g. "12.345.678" for a DNI, "20-12345678-9" for a CUIL).
@@ -50,7 +51,10 @@ public class PatientIdentifierJpaEntity {
     /**
      * The patient identity this identifier belongs to.
      * Foreign key: {@code patient_identity_id} → {@code patient_identities.id}.
+     * Excluded from {@code toString()} to avoid circular references and lazy-proxy
+     * logging outside a transaction.
      */
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_identity_id", nullable = false)
     private PatientIdentityJpaEntity patientIdentity;
@@ -58,7 +62,9 @@ public class PatientIdentifierJpaEntity {
     /**
      * The type that classifies this identifier (DNI, CUIL, Passport, etc.).
      * Foreign key: {@code patient_identifier_type_id} → {@code patient_identifier_types.patient_identifier_type_id}.
+     * Excluded from {@code toString()} to avoid triggering a lazy load in logs.
      */
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "patient_identifier_type_id", nullable = false)
     private PatientIdentifierTypeJpaEntity patientIdentifierType;

@@ -6,6 +6,7 @@ import wfederico.pneumacare.shared.security.encryption.AesAttributeConverter;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +37,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Builder
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class PatientIdentityJpaEntity {
@@ -66,8 +68,16 @@ public class PatientIdentityJpaEntity {
      *
      * <p>Cascade {@code ALL} + {@code orphanRemoval} ensures identifiers are
      * persisted and deleted together with the owning identity record.
+     *
+     * <p>The Lombok getter is suppressed in favour of a hand-written one that
+     * returns an unmodifiable view, preventing callers from mutating the internal
+     * list directly. Use {@link #addIdentifier(PatientIdentifierJpaEntity)} to
+     * append a new identifier.
      */
     @Builder.Default
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    @ToString.Exclude
     @OneToMany(mappedBy = "patientIdentity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PatientIdentifierJpaEntity> identifiers = new ArrayList<>();
 
@@ -78,4 +88,34 @@ public class PatientIdentityJpaEntity {
      */
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
+
+    // ── Collection accessors ────────────────────────────────────────────────
+
+    /**
+     * Returns an unmodifiable view of the identifiers list.
+     * Use {@link #addIdentifier(PatientIdentifierJpaEntity)} to add entries.
+     */
+    public List<PatientIdentifierJpaEntity> getIdentifiers() {
+        return Collections.unmodifiableList(identifiers);
+    }
+
+    /**
+     * Replaces the contents of the identifiers list in-place (used by Hibernate
+     * for programmatic reconstruction and by tests).
+     */
+    public void setIdentifiers(List<PatientIdentifierJpaEntity> identifiers) {
+        this.identifiers.clear();
+        if (identifiers != null) {
+            this.identifiers.addAll(identifiers);
+        }
+    }
+
+    /**
+     * Appends a single identifier to this identity's collection.
+     * Preferred over {@code getIdentifiers().add(…)}, which would throw
+     * {@link UnsupportedOperationException} on the unmodifiable view.
+     */
+    public void addIdentifier(PatientIdentifierJpaEntity identifier) {
+        this.identifiers.add(identifier);
+    }
 }

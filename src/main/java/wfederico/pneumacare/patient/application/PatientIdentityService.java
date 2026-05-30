@@ -15,8 +15,11 @@ import wfederico.pneumacare.patient.web.dto.PatientResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Application service for patient identity management.
@@ -40,6 +43,10 @@ public class PatientIdentityService {
      * Registers a new patient identity together with all provided identifiers.
      * PII fields and identifier values are encrypted at rest.
      *
+     * <p>All identifier types are resolved in a single {@code findAllById} query
+     * to avoid N+1 SELECT statements. Any unknown type IDs are reported together
+     * in a single error.
+     *
      * @param request plain-text patient identity data including at least one identifier
      * @return the created record with plain-text PII (decrypted by JPA on read-back)
      * @throws BusinessLayerException with {@code 400} if the request contains duplicate
@@ -57,6 +64,27 @@ public class PatientIdentityService {
             }
         }
 
+        // Resolve all identifier types in one query (avoids N+1 SELECTs)
+        List<Integer> typeIds = request.identifiers().stream()
+                .map(PatientIdentifierRequest::identifierTypeId)
+                .toList();
+
+        Map<Integer, PatientIdentifierTypeJpaEntity> typeMap = identifierTypeRepository
+                .findAllById(typeIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        PatientIdentifierTypeJpaEntity::getPatientIdentifierTypeId,
+                        t -> t));
+
+        List<Integer> unknownTypeIds = typeIds.stream()
+                .filter(id -> !typeMap.containsKey(id))
+                .toList();
+        if (!unknownTypeIds.isEmpty()) {
+            throw new BusinessLayerException(
+                    "Unknown identifier type IDs: " + unknownTypeIds,
+                    HttpStatus.BAD_REQUEST);
+        }
+
         PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
                 .firstName(request.firstName())
                 .lastName(request.lastName())
@@ -64,19 +92,13 @@ public class PatientIdentityService {
                 .build();
 
         request.identifiers().forEach(req -> {
-            PatientIdentifierTypeJpaEntity type = identifierTypeRepository
-                    .findById(req.identifierTypeId())
-                    .orElseThrow(() -> new BusinessLayerException(
-                            "Identifier type not found: " + req.identifierTypeId(),
-                            HttpStatus.BAD_REQUEST));
-
             PatientIdentifierJpaEntity identifier = PatientIdentifierJpaEntity.builder()
                     .patientIdentifierName(req.value())
                     .patientIdentity(identity)
-                    .patientIdentifierType(type)
+                    .patientIdentifierType(typeMap.get(req.identifierTypeId()))
                     .build();
 
-            identity.getIdentifiers().add(identifier);
+            identity.addIdentifier(identifier);
         });
 
         return PatientResponse.from(repository.save(identity));

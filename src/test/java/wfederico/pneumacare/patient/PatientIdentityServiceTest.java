@@ -90,7 +90,7 @@ class PatientIdentityServiceTest {
     void create_standardDniAdmission_returnsPatientWithDni() {
         // Arrange
         CreatePatientRequest request = request(new PatientIdentifierRequest(1, "35123456"));
-        when(identifierTypeRepository.findById(1)).thenReturn(Optional.of(dniType));
+        when(identifierTypeRepository.findAllById(List.of(1))).thenReturn(List.of(dniType));
 
         UUID id = UUID.randomUUID();
         when(repository.save(any(PatientIdentityJpaEntity.class)))
@@ -116,7 +116,7 @@ class PatientIdentityServiceTest {
     void create_foreignPatientAdmission_returnsPatientWithPassport() {
         // Arrange
         CreatePatientRequest request = request(new PatientIdentifierRequest(6, "AB123456"));
-        when(identifierTypeRepository.findById(6)).thenReturn(Optional.of(passportType));
+        when(identifierTypeRepository.findAllById(List.of(6))).thenReturn(List.of(passportType));
 
         UUID id = UUID.randomUUID();
         when(repository.save(any(PatientIdentityJpaEntity.class)))
@@ -143,8 +143,7 @@ class PatientIdentityServiceTest {
                         new PatientIdentifierRequest(1, "35123456"),
                         new PatientIdentifierRequest(2, "20351234568")));
 
-        when(identifierTypeRepository.findById(1)).thenReturn(Optional.of(dniType));
-        when(identifierTypeRepository.findById(2)).thenReturn(Optional.of(cuilType));
+        when(identifierTypeRepository.findAllById(List.of(1, 2))).thenReturn(List.of(dniType, cuilType));
 
         UUID id = UUID.randomUUID();
         when(repository.save(any(PatientIdentityJpaEntity.class)))
@@ -209,7 +208,7 @@ class PatientIdentityServiceTest {
     @DisplayName("Unknown identifier type ID — throws 400 Bad Request")
     void create_unknownIdentifierTypeId_throwsBadRequest() {
         CreatePatientRequest request = request(new PatientIdentifierRequest(99999, "35123456"));
-        when(identifierTypeRepository.findById(99999)).thenReturn(Optional.empty());
+        when(identifierTypeRepository.findAllById(List.of(99999))).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(BusinessLayerException.class)
