@@ -6,11 +6,9 @@ package wfederico.pneumacare.shared.constants;
  * and comply with PMD rules.
  */
 public final class ExceptionMessageConstants {
+    public ExceptionMessageConstants() {
+    }
 
-    /* Error message when a player is not found */
-    public static final  String PLAYER_NOT_FOUND = "No se encontró jugador con ese ID";
-    /* Error message when a player list is empty */
-    public static final  String PLAYERS_NOT_FOUND = "No hay registros de jugadores en la base de datos";
-    /* Error message when a team is not found */
-    public static final  String TEAM_NOT_FOUND = "No se encontró equipo con ese ID";
+    /* Error message when pplat is <= peepTotal in calculateCstat */
+    public static final  String CSTAT_FORMULA_ERROR = "La presion meseta debe ser menor al PEEP total";
 }
