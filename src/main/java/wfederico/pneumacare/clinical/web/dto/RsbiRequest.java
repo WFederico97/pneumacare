@@ -16,12 +16,12 @@ public record RsbiRequest(
         @NotNull
         @Positive
         @DecimalMax("80.0")
-        double respiratoryRate,
+        Double respiratoryRate,
 
         /** Tidal volume in litres. Typical range: 0.3–0.8 L. */
         @NotNull
         @DecimalMin("0.05")
         @DecimalMax("3.0")
-        double tidalVolume
+        Double tidalVolume
 ) {}
 

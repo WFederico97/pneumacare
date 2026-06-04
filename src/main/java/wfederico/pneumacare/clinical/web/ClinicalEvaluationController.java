@@ -7,7 +7,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.clinical.application.ClinicalEvaluationService;
-import wfederico.pneumacare.clinical.web.dto.*;
+import wfederico.pneumacare.clinical.web.dto.CstatRequest;
+import wfederico.pneumacare.clinical.web.dto.CstatResponse;
+import wfederico.pneumacare.clinical.web.dto.PafiRequest;
+import wfederico.pneumacare.clinical.web.dto.PafiResponse;
+import wfederico.pneumacare.clinical.web.dto.RsbiRequest;
+import wfederico.pneumacare.clinical.web.dto.RsbiResponse;
 import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 
@@ -21,7 +26,7 @@ import org.slf4j.MDC;
  *   <li>{@code POST /api/v1/evaluations/rsbi}  — Rapid Shallow Breathing Index</li>
  *   <li>{@code POST /api/v1/evaluations/pafi}  — PaO₂/FiO₂ ratio (PaFi)</li>
  *   <li>{@code POST /api/v1/evaluations/cstat} — Static respiratory compliance (Cstat)</li>
- * </ul
+ * </ul>
  *
  * <p>Spring MVC's {@code ServerHttpObservationFilter} automatically creates an
  * OTel HTTP server span for every request; the span includes the HTTP method,

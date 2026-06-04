@@ -6,7 +6,12 @@ import org.springframework.stereotype.Service;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
-import wfederico.pneumacare.clinical.web.dto.*;
+import wfederico.pneumacare.clinical.web.dto.CstatRequest;
+import wfederico.pneumacare.clinical.web.dto.CstatResponse;
+import wfederico.pneumacare.clinical.web.dto.PafiRequest;
+import wfederico.pneumacare.clinical.web.dto.PafiResponse;
+import wfederico.pneumacare.clinical.web.dto.RsbiRequest;
+import wfederico.pneumacare.clinical.web.dto.RsbiResponse;
 
 /**
  * Application service for respiratory clinical index calculations.
@@ -105,9 +110,9 @@ public class ClinicalEvaluationService {
         Span current = Span.current();
         current.setAttribute("clinical.cstat.value",          cstat);
         current.setAttribute("clinical.cstat.interpretation", interpretation.name());
-        current.setAttribute("clinical.cstat.tidalVolume", req.tidalVolume());
-        current.setAttribute("clinical.cstat.plateauPressure", req.plateauPressure());
-        current.setAttribute("clinical.cstat.peepTotal", req.peepTotal());
+        current.setAttribute("clinical.cstat.tidal_volume",    req.tidalVolume());
+        current.setAttribute("clinical.cstat.plateau_pressure", req.plateauPressure());
+        current.setAttribute("clinical.cstat.peep_total",      req.peepTotal());
 
         return new CstatResponse(cstat, interpretation);
     }

@@ -6,6 +6,7 @@ import wfederico.pneumacare.clinical.application.ClinicalMathEngine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 public class ClinicalMathEngineTest {
     // ── RSBI ─────────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ public class ClinicalMathEngineTest {
     void calculatePafi_normalInputs_returnsCorrectValue() {
         double result = ClinicalMathEngine.calculatePafi(80, 0.4);
 
-        assertThat(result).isEqualTo(200.0);
+        assertThat(result).isCloseTo(200.0, within(1e-9));
     }
 
     @Test

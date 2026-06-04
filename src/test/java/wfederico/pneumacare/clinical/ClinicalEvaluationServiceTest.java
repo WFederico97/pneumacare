@@ -48,8 +48,8 @@ public class ClinicalEvaluationServiceTest {
     @Test
     @DisplayName("RSBI — value exactly at 105 is interpreted as BORDERLINE")
     void calculateRsbi_exactlyAt105_returnsBorderline() {
-        // 105 / 1.0 = 105 → BORDERLINE
-        RsbiResponse result = service.calculateRsbi(new RsbiRequest(105.0, 1.0));
+        // 52.5 / 0.5 = 105 → BORDERLINE (respiratoryRate within @DecimalMax("80.0"))
+        RsbiResponse result = service.calculateRsbi(new RsbiRequest(52.5, 0.5));
 
         assertThat(result.interpretation()).isEqualTo(RsbiInterpretation.BORDERLINE);
     }
@@ -110,8 +110,8 @@ public class ClinicalEvaluationServiceTest {
     @Test
     @DisplayName("Cstat — value >= 100 is interpreted as HIGH")
     void calculateCstat_above100_returnsHigh() {
-        // 2000 / (25 - 5) = 100.0 → HIGH
-        CstatResponse result = service.calculateCstat(new CstatRequest(2000.0, 25.0, 5.0));
+        // 1000 / (15 - 5) = 100.0 → HIGH (tidalVolume within @DecimalMax("1000.0"))
+        CstatResponse result = service.calculateCstat(new CstatRequest(1000.0, 15.0, 5.0));
 
         assertThat(result.cstat()).isEqualTo(100.0);
         assertThat(result.interpretation()).isEqualTo(CstatInterpretation.HIGH);

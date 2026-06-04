@@ -6,9 +6,8 @@ package wfederico.pneumacare.shared.constants;
  * and comply with PMD rules.
  */
 public final class ExceptionMessageConstants {
-    public ExceptionMessageConstants() {
-    }
+    private ExceptionMessageConstants() {}
 
     /* Error message when pplat is <= peepTotal in calculateCstat */
-    public static final  String CSTAT_FORMULA_ERROR = "La presion meseta debe ser menor al PEEP total";
+    public static final String CSTAT_FORMULA_ERROR = "La presión meseta debe ser mayor que el PEEP total";
 }

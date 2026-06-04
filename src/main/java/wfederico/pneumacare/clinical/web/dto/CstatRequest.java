@@ -6,14 +6,14 @@ public record CstatRequest(
         @NotNull
         @DecimalMin("50.0")
         @DecimalMax("1000.0")
-        double tidalVolume,
+        Double tidalVolume,
         @NotNull
         @Positive
         @DecimalMax("60.0")
-        double plateauPressure,
+        Double plateauPressure,
         @NotNull
         @PositiveOrZero
         @DecimalMax("30.0")
-        double peepTotal
+        Double peepTotal
 
 ) { }
