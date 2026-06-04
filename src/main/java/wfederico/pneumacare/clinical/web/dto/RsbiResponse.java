@@ -1,5 +1,7 @@
 package wfederico.pneumacare.clinical.web.dto;
 
+import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
+
 /**
  * Result of a Rapid Shallow Breathing Index (RSBI) calculation.
  *
@@ -17,5 +19,5 @@ public record RsbiResponse(
         double rsbi,
 
         /** Clinical classification based on RSBI value. */
-        String interpretation
+        RsbiInterpretation interpretation
 ) {}
