@@ -1,11 +1,11 @@
 package wfederico.pneumacare.shared.constants;
 
 public final class RequestMessageConstants {
-    public static final  String PLAYER_CREATED = "Jugador creado correctamente";
-    public static final  String PLAYER_FOUND = "Jugador encontrado";
-    public static final  String PLAYERS_FOUND = "Jugadores encontrados";
-    public static final  String PLAYER_UPDATED = "Jugador actualizado con exito";
-    public static final  String PLAYER_DELETED = "Jugador eliminado con exito";
-    public static final  String PLAYER_PATCHED = "Jugador actualizado parcialmente con exito";
+    public RequestMessageConstants() {
+    }
+
     public static final  String HEALTH_OK = "El servicio esta operativo";
+    public static final String RSBI_CALCULATED = "RSBI calculado";
+    public static final String PAFI_CALCULATED = "PaFi calculado";
+    public static final String CSTAT_CALCULATED = "Cstat calculado";
 }
