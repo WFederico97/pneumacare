@@ -7,10 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.clinical.application.ClinicalEvaluationService;
-import wfederico.pneumacare.clinical.web.dto.PafiRequest;
-import wfederico.pneumacare.clinical.web.dto.PafiResponse;
-import wfederico.pneumacare.clinical.web.dto.RsbiRequest;
-import wfederico.pneumacare.clinical.web.dto.RsbiResponse;
+import wfederico.pneumacare.clinical.web.dto.*;
+import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 
 import org.slf4j.MDC;
@@ -20,9 +18,10 @@ import org.slf4j.MDC;
  *
  * <p>Endpoints:
  * <ul>
- *   <li>{@code POST /api/v1/evaluations/rsbi} — Rapid Shallow Breathing Index</li>
- *   <li>{@code POST /api/v1/evaluations/pafi} — PaO₂/FiO₂ ratio (PaFi)</li>
- * </ul>
+ *   <li>{@code POST /api/v1/evaluations/rsbi}  — Rapid Shallow Breathing Index</li>
+ *   <li>{@code POST /api/v1/evaluations/pafi}  — PaO₂/FiO₂ ratio (PaFi)</li>
+ *   <li>{@code POST /api/v1/evaluations/cstat} — Static respiratory compliance (Cstat)</li>
+ * </ul
  *
  * <p>Spring MVC's {@code ServerHttpObservationFilter} automatically creates an
  * OTel HTTP server span for every request; the span includes the HTTP method,
@@ -64,7 +63,7 @@ public class ClinicalEvaluationController {
         return ResponseEntity.ok(
                 ApiResponseBase.<RsbiResponse>builder()
                         .status(200)
-                        .message("RSBI calculated successfully")
+                        .message(RequestMessageConstants.RSBI_CALCULATED)
                         .data(result)
                         .traceId(MDC.get("traceId"))
                         .build()
@@ -92,7 +91,33 @@ public class ClinicalEvaluationController {
         return ResponseEntity.ok(
                 ApiResponseBase.<PafiResponse>builder()
                         .status(200)
-                        .message("PaFi calculated successfully")
+                        .message(RequestMessageConstants.PAFI_CALCULATED)
+                        .data(result)
+                        .traceId(MDC.get("traceId"))
+                        .build()
+        );
+    }
+    /**
+     * Calculates the static respiratory system compliance (Cstat).
+     *
+     * <p>Example request:
+     * <pre>{@code
+     * POST /api/v1/evaluations/cstat
+     * {
+     *   "tidalVolume": 500,
+     *   "plateauPressure": 25,
+     *   "peepTotal": 5
+     * }
+     * }</pre>
+     */
+    @PostMapping("/cstat")
+    public ResponseEntity<ApiResponseBase<CstatResponse>> calculateCstat(@Valid @RequestBody CstatRequest request){
+        CstatResponse result = evaluationService.calculateCstat(request);
+
+        return ResponseEntity.ok(
+                ApiResponseBase.<CstatResponse>builder()
+                        .status(200)
+                        .message(RequestMessageConstants.CSTAT_CALCULATED)
                         .data(result)
                         .traceId(MDC.get("traceId"))
                         .build()
