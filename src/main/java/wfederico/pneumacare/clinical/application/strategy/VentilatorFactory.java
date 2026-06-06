@@ -23,24 +23,28 @@ import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.UN
 @Component
 public class VentilatorFactory {
     private final TecmeStrategy tecmeStrategy;
+    private final NeumoventStrategy neumoventStrategy;
 
-    public VentilatorFactory(TecmeStrategy tecmeStrategy){
+    public VentilatorFactory(TecmeStrategy tecmeStrategy, NeumoventStrategy neumoventStrategy) {
         this.tecmeStrategy = tecmeStrategy;
+        this.neumoventStrategy = neumoventStrategy;
     }
 
     /**
      * Resolves the strategy for the given ventilator brand.
      *
-     * @param brand ventilator brand identifier (case-insensitive, e.g. {@code "TECME"})
+     * @param brand ventilator brand identifier (case-insensitive,
+     *              e.g. {@code "TECME"}, {@code "NEUMOVENT"})
      * @return the strategy instance registered for {@code brand}
      * @throws IllegalArgumentException if {@code brand} is {@code null} or unrecognised
      */
-    public VentilatorStrategy resolve(String brand){
-        if (brand == null){
+    public VentilatorStrategy resolve(String brand) {
+        if (brand == null) {
             throw new IllegalArgumentException(UNKNOWN_BRAND_ERROR);
         }
-        return switch (brand.toUpperCase()){
-            case "TECME" -> tecmeStrategy;
+        return switch (brand.toUpperCase()) {
+            case "TECME"     -> tecmeStrategy;
+            case "NEUMOVENT" -> neumoventStrategy;
             default -> throw new IllegalArgumentException(UNKNOWN_BRAND_ERROR + brand);
         };
     }
