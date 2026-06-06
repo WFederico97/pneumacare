@@ -3,6 +3,7 @@ package wfederico.pneumacare.clinical.strategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import wfederico.pneumacare.clinical.application.strategy.NeumoventStrategy;
 import wfederico.pneumacare.clinical.application.strategy.TecmeStrategy;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
 
@@ -18,7 +19,7 @@ class VentilatorFactoryTest {
 
     @BeforeEach
     void setUp() {
-        factory = new VentilatorFactory(new TecmeStrategy());
+        factory = new VentilatorFactory(new TecmeStrategy(), new NeumoventStrategy());
     }
 
     // ── Successful resolution ─────────────────────────────────────────────────
@@ -35,6 +36,20 @@ class VentilatorFactoryTest {
     void resolve_tecmeLowercase_returnsTecmeStrategy() {
         assertThat(factory.resolve("tecme"))
                 .isInstanceOf(TecmeStrategy.class);
+    }
+
+    @Test
+    @DisplayName("resolve() — brand 'NEUMOVENT' (uppercase) resolves to NeumoventStrategy")
+    void resolve_neumoventUppercase_returnsNeumoventStrategy() {
+        assertThat(factory.resolve("NEUMOVENT"))
+                .isInstanceOf(NeumoventStrategy.class);
+    }
+
+    @Test
+    @DisplayName("resolve() — brand 'neumovent' (lowercase) resolves to NeumoventStrategy")
+    void resolve_neumoventLowercase_returnsNeumoventStrategy() {
+        assertThat(factory.resolve("neumovent"))
+                .isInstanceOf(NeumoventStrategy.class);
     }
 
     // ── Error cases ───────────────────────────────────────────────────────────

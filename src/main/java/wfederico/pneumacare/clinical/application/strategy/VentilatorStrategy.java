@@ -19,7 +19,8 @@ import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
  *
  * <p>Known implementations:
  * <ul>
- *   <li>{@link TecmeStrategy} — TECME (baseline; canonical units)</li>
+ *   <li>{@link TecmeStrategy} — TECME (baseline; tidal volume in mL)</li>
+ *   <li>{@link NeumoventStrategy} — Neumovent (tidal volume in L)</li>
  * </ul>
  */
 public interface VentilatorStrategy {
