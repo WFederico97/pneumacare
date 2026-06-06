@@ -58,7 +58,7 @@ public class ClinicalEvaluationService {
     )
     public RsbiResponse calculateRsbi(RsbiRequest req) {
         double rsbi = ClinicalMathEngine.calculateRsbi(req.respiratoryRate(),req.tidalVolume());
-        RsbiInterpretation interpretation = interpretRsbi(rsbi);
+        RsbiInterpretation interpretation = RsbiInterpretation.from(rsbi);
         // ── Safe span attributes — computed values only, no PII ──────────────
         Span current = Span.current();
         current.setAttribute("clinical.rsbi.value",          rsbi);
@@ -85,7 +85,7 @@ public class ClinicalEvaluationService {
     )
     public PafiResponse calculatePafi(PafiRequest req) {
         double pafi = ClinicalMathEngine.calculatePafi(req.pao2(),req.fio2());
-        PafiClassification classification = classifyPafi(pafi);
+        PafiClassification classification = PafiClassification.from(pafi);
 
         // ── Safe span attributes — computed values only, no PII ──────────────
         Span current = Span.current();
@@ -104,7 +104,7 @@ public class ClinicalEvaluationService {
     )
     public CstatResponse calculateCstat(CstatRequest req) {
         double cstat = ClinicalMathEngine.calculateCstat(req.tidalVolume(),req.plateauPressure(), req.peepTotal());
-        CstatInterpretation interpretation = interpretCstat(cstat);
+        CstatInterpretation interpretation = CstatInterpretation.from(cstat);
 
         // ── Safe span attributes — computed values only, no PII ──────────────
         Span current = Span.current();
@@ -115,27 +115,5 @@ public class ClinicalEvaluationService {
         current.setAttribute("clinical.cstat.peep_total",      req.peepTotal());
 
         return new CstatResponse(cstat, interpretation);
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    private static RsbiInterpretation interpretRsbi(double rsbi) {
-        if (rsbi < 80)   return RsbiInterpretation.FAVORABLE;
-        if (rsbi <= 105) return RsbiInterpretation.BORDERLINE;
-        return RsbiInterpretation.UNFAVORABLE;
-    }
-
-    private static PafiClassification classifyPafi(double pafi) {
-        if (pafi >= 400) return PafiClassification.NORMAL;
-        if (pafi >= 300) return PafiClassification.AT_RISK;
-        if (pafi >= 200) return PafiClassification.MILD_ARDS;
-        if (pafi >= 100) return PafiClassification.MODERATE_ARDS;
-        return PafiClassification.SEVERE_ARDS;
-    }
-
-    private static CstatInterpretation interpretCstat(double cstat) {
-        if (cstat >= 100) return CstatInterpretation.HIGH;
-        if (cstat >= 50)  return CstatInterpretation.NORMAL;
-        return CstatInterpretation.LOW;
     }
 }
