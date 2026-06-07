@@ -29,7 +29,7 @@ public class PatientIdentifierTypeJpaEntity {
     @Column(name = "patient_identifier_type_id", updatable = false, nullable = false)
     private Integer patientIdentifierTypeId;
 
-    @Column(name = "patient_identifier_type_name", nullable = false)
+    @Column(name = "patient_identifier_type_name", nullable = false, unique = true)
     private String patientIdentifierTypeName;
 
     @Column(name = "patient_identifier_type_description")
