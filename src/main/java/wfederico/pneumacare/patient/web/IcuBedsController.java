@@ -8,14 +8,18 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.patient.application.IcuBedService;
+import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
@@ -83,6 +87,20 @@ public class IcuBedsController {
                 ApiResponseBase.<List<IcuBedResponse>>builder()
                         .status(HttpStatus.OK.value())
                         .message(RequestMessageConstants.ICU_BEDS_RETRIEVED)
+                        .data(data)
+                        .traceId(MDC.get("traceId"))
+                        .build());
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponseBase<IcuBedResponse>> createIcuBed(
+            @Valid @RequestBody CreateIcuBedRequest request) {
+        IcuBedResponse data = service.create(request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponseBase.<IcuBedResponse>builder()
+                        .status(HttpStatus.CREATED.value())
+                        .message(RequestMessageConstants.ICU_BED_CREATED)
                         .data(data)
                         .traceId(MDC.get("traceId"))
                         .build());

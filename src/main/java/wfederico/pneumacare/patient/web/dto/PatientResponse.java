@@ -4,16 +4,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientJpaEntity;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 
 /**
  * Response payload for patient admission and retrieval endpoints.
  *
- * <p>All PII fields ({@code firstName}, {@code lastName}, {@code dni}, and any
- * additional identifier values) are returned as plain text — the JPA persistence
- * layer decrypts them transparently from AES-256-GCM storage before this record
- * is populated.
+ * <p>All PII fields ({@code firstName}, {@code lastName}, and the identifier
+ * value) are returned as plain text — the JPA persistence layer decrypts them
+ * transparently from AES-256-GCM storage before this record is populated.
  *
  * <h2>UUID semantics</h2>
  * {@link #patientId} is the operational record UUID ({@code patients.id}). This
@@ -44,10 +42,8 @@ public record PatientResponse(
                 format = "date")
         java.time.LocalDate birthDate,
 
-        @Schema(
-                description = "[PII] DNI number, decrypted from AES-256-GCM storage.",
-                example = "35123456")
-        String dni,
+        @Schema(description = "The patient's identifier (type + value), decrypted from AES-256-GCM storage.")
+        PatientIdentifierResponse identifier,
 
         @Schema(
                 description = "UUID of the ICU the patient was admitted to.",
@@ -68,22 +64,14 @@ public record PatientResponse(
         OffsetDateTime admissionDate,
 
         @Schema(description = "Current clinical status of the patient.", example = "ADMITTED")
-        String clinicalStatus,
-
-        @Schema(
-                description = "Additional patient identifiers (CUIL, CUIT, Passport, etc.). " +
-                        "Values are decrypted from AES-256-GCM storage. " +
-                        "Does not include the DNI — use the top-level 'dni' field instead.")
-        List<PatientIdentifierResponse> additionalIdentifiers) {
+        String clinicalStatus) {
 
     /**
      * Maps a fully-loaded {@link PatientJpaEntity} to this response DTO.
      *
-     * <p>The DNI is extracted from the identity's identifier list by finding the
-     * entry whose type name is {@code "DNI"} (case-insensitive). All other
-     * identifiers are mapped to {@link PatientIdentifierResponse} entries.
-     *
-     * <p>The caller must ensure that the entity was loaded with its
+     * <p>The single patient identifier (first entry in the identity's identifier
+     * list) is mapped to a {@link PatientIdentifierResponse}. The caller must
+     * ensure that the entity was loaded with its
      * {@code identity.identifiers.patientIdentifierType} association populated
      * (e.g. via {@code @EntityGraph}) to avoid lazy-load exceptions.
      *
@@ -93,29 +81,19 @@ public record PatientResponse(
     public static PatientResponse from(PatientJpaEntity entity) {
         var identity = entity.getIdentity();
 
-        String dniValue = identity.getIdentifiers().stream()
-                .filter(id -> "DNI".equalsIgnoreCase(
-                        id.getPatientIdentifierType().getPatientIdentifierTypeName()))
-                .map(id -> id.getPatientIdentifierName())
-                .findFirst()
-                .orElse(null);
-
-        List<PatientIdentifierResponse> extras = identity.getIdentifiers().stream()
-                .filter(id -> !"DNI".equalsIgnoreCase(
-                        id.getPatientIdentifierType().getPatientIdentifierTypeName()))
-                .map(PatientIdentifierResponse::from)
-                .toList();
+        PatientIdentifierResponse identifierResponse = identity.getIdentifiers().isEmpty()
+                ? null
+                : PatientIdentifierResponse.from(identity.getIdentifiers().get(0));
 
         return new PatientResponse(
                 entity.getId(),
                 identity.getFirstName(),
                 identity.getLastName(),
                 identity.getBirthDate(),
-                dniValue,
+                identifierResponse,
                 entity.getIcu().getId(),
                 entity.getBed() != null ? entity.getBed().getId() : null,
                 entity.getAdmissionDate(),
-                entity.getClinicalStatus().name(),
-                extras);
+                entity.getClinicalStatus().name());
     }
 }

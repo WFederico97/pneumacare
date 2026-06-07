@@ -1,6 +1,5 @@
 package wfederico.pneumacare.patient.application;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,18 +19,11 @@ import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityRe
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
 import wfederico.pneumacare.patient.web.dto.CreatePatientRequest;
-import wfederico.pneumacare.patient.web.dto.PatientIdentifierRequest;
 import wfederico.pneumacare.patient.web.dto.PatientResponse;
 import wfederico.pneumacare.shared.constants.ExceptionMessageConstants;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Application service for patient admission.
@@ -40,8 +32,9 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>Validates ICU and bed (bed must exist, belong to the ICU, and be AVAILABLE).</li>
  *   <li>Creates the {@code patient_identities} PII record (firstName, lastName,
- *       birthDate) and the {@code patient_identifiers} rows (DNI + any extras).
- *       All PII values are encrypted transparently by the JPA layer.</li>
+ *       birthDate) and a single {@code patient_identifiers} row for the supplied
+ *       identifier (e.g. DNI, Pasaporte). All PII values are encrypted transparently
+ *       by the JPA layer.</li>
  *   <li>Creates the {@code patients} operational record linking identity, ICU, and bed.</li>
  *   <li>Marks the bed {@code OCCUPIED}.</li>
  * </ol>
@@ -52,8 +45,8 @@ import java.util.stream.Collectors;
  * This service always receives and returns plain-text values.
  * {@link wfederico.pneumacare.shared.security.encryption.AesAttributeConverter}
  * handles AES-256-GCM encrypt/decrypt transparently at the JPA boundary.
- * Never log or expose {@code firstName}, {@code lastName}, {@code dni}, or any
- * identifier value in plain text in log statements.
+ * Never log or expose {@code firstName}, {@code lastName}, or any identifier value
+ * in plain text in log statements.
  *
  * <h2>Concurrency note</h2>
  * Simultaneous admission requests targeting the same bed may both pass the
@@ -66,45 +59,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PatientIdentityService {
 
-    private static final String DNI_TYPE_NAME = "DNI";
-
     private final PatientIdentityRepository identityRepository;
     private final PatientIdentifierTypeRepository identifierTypeRepository;
     private final PatientRepository patientRepository;
     private final IcuRepository icuRepository;
     private final IcuBedRepository icuBedRepository;
 
-    /**
-     * Cached database ID of the DNI identifier type.
-     * Loaded once at startup — avoids a per-request catalog query.
-     */
-    private Integer dniTypeId;
-
-    /**
-     * Caches the DNI identifier type id after the bean is fully wired.
-     * Logs a warning if the catalog has not been seeded yet
-     * (integration tests without seeding will still work: the service
-     * falls back to a per-request lookup in that case).
-     */
-    @PostConstruct
-    public void initDniTypeId() {
-        identifierTypeRepository.findAll().stream()
-                .filter(t -> DNI_TYPE_NAME.equalsIgnoreCase(t.getPatientIdentifierTypeName()))
-                .findFirst()
-                .ifPresentOrElse(
-                        t -> {
-                            dniTypeId = t.getPatientIdentifierTypeId();
-                            log.debug("PatientIdentityService: cached DNI type id = {}", dniTypeId);
-                        },
-                        () -> log.warn("PatientIdentityService: 'DNI' not found in catalog at startup")
-                );
-    }
-
     // ── Public API ─────────────────────────────────────────────────────────────
 
     /**
-     * Admits a new patient: creates the PII identity record, persists all identifiers
-     * (DNI + extras), creates the operational patient row, and marks the bed OCCUPIED.
+     * Admits a new patient: creates the PII identity record, persists the
+     * identifier, creates the operational patient row, and marks the bed OCCUPIED.
      *
      * <p>All work is performed in a single transaction. On any failure the entire
      * admission is rolled back.
@@ -113,8 +78,7 @@ public class PatientIdentityService {
      * @return the admission response with plain-text PII and the operational {@code patientId}
      * @throws BusinessLayerException with {@code 404} if the ICU or bed is not found
      * @throws BusinessLayerException with {@code 400} if the bed is not in the given ICU,
-     *         the bed is not AVAILABLE, a duplicate identifier type was supplied,
-     *         an unknown identifier type id was supplied, or the identity is already admitted
+     *         the bed is not AVAILABLE, or the identifier type ID is unknown
      */
     @Transactional
     public PatientResponse create(CreatePatientRequest request) {
@@ -216,54 +180,21 @@ public class PatientIdentityService {
     }
 
     /**
-     * Builds the {@link PatientIdentityJpaEntity} with all identifiers (DNI + extras)
-     * and persists it in a single save.
-     *
-     * <p>The DNI is converted to a synthetic {@link PatientIdentifierRequest} using
-     * the cached {@link #dniTypeId} so it flows through the same validation and
-     * encryption pipeline as any other identifier.
+     * Builds the {@link PatientIdentityJpaEntity} with the single supplied identifier
+     * and persists it.
      *
      * @param request the incoming admission request
      * @return the saved identity entity (with generated UUID)
+     * @throws BusinessLayerException 400 if the identifier type ID is not in the catalog
      */
     private PatientIdentityJpaEntity buildAndSaveIdentity(CreatePatientRequest request) {
-        // Merge DNI (top-level) with any extras into a single list for uniform processing
-        List<PatientIdentifierRequest> allIdentifiers = new ArrayList<>();
-        allIdentifiers.add(new PatientIdentifierRequest(resolveDniTypeId(), request.dni()));
-        if (request.additionalIdentifiers() != null) {
-            allIdentifiers.addAll(request.additionalIdentifiers());
-        }
+        int typeId = request.identifier().identifierTypeId();
 
-        // Guard: reject duplicate identifier types within the same request
-        Set<Integer> seenTypeIds = new HashSet<>();
-        for (PatientIdentifierRequest req : allIdentifiers) {
-            if (!seenTypeIds.add(req.identifierTypeId())) {
-                throw new BusinessLayerException(
-                        "Duplicate identifier type in request: " + req.identifierTypeId(),
-                        HttpStatus.BAD_REQUEST);
-            }
-        }
-
-        // Resolve all identifier types in one query (avoids N+1 SELECTs)
-        List<Integer> typeIds = allIdentifiers.stream()
-                .map(PatientIdentifierRequest::identifierTypeId)
-                .toList();
-
-        Map<Integer, PatientIdentifierTypeJpaEntity> typeMap = identifierTypeRepository
-                .findAllById(typeIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        PatientIdentifierTypeJpaEntity::getPatientIdentifierTypeId,
-                        t -> t));
-
-        List<Integer> unknownTypeIds = typeIds.stream()
-                .filter(id -> !typeMap.containsKey(id))
-                .toList();
-        if (!unknownTypeIds.isEmpty()) {
-            throw new BusinessLayerException(
-                    "Unknown identifier type IDs: " + unknownTypeIds,
-                    HttpStatus.BAD_REQUEST);
-        }
+        PatientIdentifierTypeJpaEntity identifierType = identifierTypeRepository
+                .findById(typeId)
+                .orElseThrow(() -> new BusinessLayerException(
+                        "Unknown identifier type ID: " + typeId,
+                        HttpStatus.BAD_REQUEST));
 
         PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
                 .firstName(request.firstName())
@@ -271,38 +202,13 @@ public class PatientIdentityService {
                 .birthDate(request.birthDate())
                 .build();
 
-        allIdentifiers.forEach(req -> {
-            PatientIdentifierJpaEntity identifier = PatientIdentifierJpaEntity.builder()
-                    .patientIdentifierName(req.value())
-                    .patientIdentity(identity)
-                    .patientIdentifierType(typeMap.get(req.identifierTypeId()))
-                    .build();
-            identity.addIdentifier(identifier);
-        });
+        PatientIdentifierJpaEntity identifier = PatientIdentifierJpaEntity.builder()
+                .patientIdentifierName(request.identifier().value())
+                .patientIdentity(identity)
+                .patientIdentifierType(identifierType)
+                .build();
+        identity.addIdentifier(identifier);
 
         return identityRepository.save(identity);
-    }
-
-    /**
-     * Returns the cached DNI type id, falling back to a live DB lookup if the
-     * cache was not populated at startup (e.g. empty catalog in some test contexts).
-     *
-     * @return the integer primary key of the DNI identifier type
-     * @throws BusinessLayerException 400 if the DNI type is not found in the catalog
-     */
-    private Integer resolveDniTypeId() {
-        if (dniTypeId != null) {
-            return dniTypeId;
-        }
-        return identifierTypeRepository.findAll().stream()
-                .filter(t -> DNI_TYPE_NAME.equalsIgnoreCase(t.getPatientIdentifierTypeName()))
-                .findFirst()
-                .map(t -> {
-                    dniTypeId = t.getPatientIdentifierTypeId();
-                    return dniTypeId;
-                })
-                .orElseThrow(() -> new BusinessLayerException(
-                        "Identifier type 'DNI' not found in catalog",
-                        HttpStatus.BAD_REQUEST));
     }
 }

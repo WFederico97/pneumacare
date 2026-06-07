@@ -48,21 +48,16 @@ import static org.mockito.Mockito.when;
  * does NOT run — entities hold plain-text values, which is correct for isolated
  * service-layer tests.
  *
- * <p>{@code @PostConstruct} is not invoked by {@code @InjectMocks}, so
- * {@code initDniTypeId()} is called manually in {@link #setUp()} after stubbing
- * {@code identifierTypeRepository.findAll()} to return the DNI type.
- *
  * <h3>Scenarios covered</h3>
  * <ul>
- *   <li>Happy path — full admission with DNI only</li>
- *   <li>Happy path — admission with DNI + CUIL additional identifier</li>
+ *   <li>Happy path — admission with DNI identifier</li>
+ *   <li>Happy path — admission with Pasaporte identifier</li>
  *   <li>Bed is occupied after admission (status mutation verified)</li>
  *   <li>ICU not found throws 404</li>
  *   <li>Bed not found in ICU throws 400</li>
  *   <li>Bed is OCCUPIED throws 400</li>
  *   <li>Bed is MAINTENANCE throws 400</li>
- *   <li>Unknown additional identifier type ID throws 400</li>
- *   <li>Duplicate identifier type in additionalIdentifiers throws 400</li>
+ *   <li>Unknown identifier type ID throws 400</li>
  *   <li>findById — found path returns full response</li>
  *   <li>findById — not-found throws 404</li>
  * </ul>
@@ -83,23 +78,22 @@ class PatientIdentityServiceTest {
 
     private static final String     FIRST_NAME = "Juan";
     private static final String     LAST_NAME  = "Pérez";
-    private static final String     DNI_VALUE  = "35123456";
     private static final LocalDate  BIRTH_DATE = LocalDate.of(1990, 5, 20);
 
-    private static final UUID ICU_ID    = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
-    private static final UUID BED_ID    = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
-    private static final UUID PATIENT_ID = UUID.randomUUID();
+    private static final UUID ICU_ID     = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID BED_ID     = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
+    private static final UUID PATIENT_ID  = UUID.randomUUID();
     private static final UUID IDENTITY_ID = UUID.randomUUID();
 
     private PatientIdentifierTypeJpaEntity dniType;
-    private PatientIdentifierTypeJpaEntity cuilType;
+    private PatientIdentifierTypeJpaEntity pasaporteType;
     private IcuJpaEntity                   icu;
     private IcuBedJpaEntity                availableBed;
 
     @BeforeEach
     void setUp() {
-        dniType  = buildType(1, "DNI",  "Documento Nacional de Identidad");
-        cuilType = buildType(2, "CUIL", "Código Único de Identificación Laboral");
+        dniType       = buildType(1, "DNI",       "Documento Nacional de Identidad");
+        pasaporteType = buildType(5, "Pasaporte", "Pasaporte");
 
         icu = IcuJpaEntity.builder()
                 .id(ICU_ID)
@@ -114,27 +108,19 @@ class PatientIdentityServiceTest {
                 .bedNumber("BED-001")
                 .status(BedStatus.AVAILABLE)
                 .build();
-
-        // Simulate @PostConstruct — resolves and caches dniTypeId.
-        // Use lenient() so Mockito strict-stubs don't flag the findAll() call as
-        // "unnecessary" in tests that throw before reaching resolveDniTypeId().
-        org.mockito.Mockito.lenient()
-                .when(identifierTypeRepository.findAll())
-                .thenReturn(List.of(dniType, cuilType));
-        service.initDniTypeId();
     }
 
     // ── create() — happy path ─────────────────────────────────────────────────
 
     @Test
-    @DisplayName("create — DNI-only admission — patient admitted, 201 response with patientId and bedId")
-    void create_dniOnlyAdmission_returnsResponseWithPatientAndBedId() {
+    @DisplayName("create — admission with DNI — patient admitted, response contains identifier type and value")
+    void create_admissionWithDni_returnsResponseWithIdentifier() {
         // Arrange
-        CreatePatientRequest request = minimalRequest();
+        CreatePatientRequest request = requestWith(new PatientIdentifierRequest(1, "35123456"));
         stubIcuAndBed();
         PatientIdentityJpaEntity savedIdentity = buildIdentityEntity(IDENTITY_ID,
-                List.of(buildIdentifier(DNI_VALUE, dniType)));
-        when(identifierTypeRepository.findAllById(List.of(1))).thenReturn(List.of(dniType));
+                List.of(buildIdentifier("35123456", dniType)));
+        when(identifierTypeRepository.findById(1)).thenReturn(Optional.of(dniType));
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
@@ -148,26 +134,26 @@ class PatientIdentityServiceTest {
         assertThat(response.patientId()).isEqualTo(PATIENT_ID);
         assertThat(response.firstName()).isEqualTo(FIRST_NAME);
         assertThat(response.lastName()).isEqualTo(LAST_NAME);
-        assertThat(response.dni()).isEqualTo(DNI_VALUE);
+        assertThat(response.identifier()).isNotNull();
+        assertThat(response.identifier().typeName()).isEqualTo("DNI");
+        assertThat(response.identifier().value()).isEqualTo("35123456");
         assertThat(response.icuId()).isEqualTo(ICU_ID);
         assertThat(response.bedId()).isEqualTo(BED_ID);
         assertThat(response.clinicalStatus()).isEqualTo("ADMITTED");
-        assertThat(response.additionalIdentifiers()).isEmpty();
 
         verify(identityRepository).save(any(PatientIdentityJpaEntity.class));
         verify(patientRepository).save(any(PatientJpaEntity.class));
     }
 
     @Test
-    @DisplayName("create — DNI + CUIL admission — both identifiers persisted, CUIL in additionalIdentifiers")
-    void create_dniAndCuilAdmission_bothIdentifiersInResponse() {
+    @DisplayName("create — admission with Pasaporte — identifier type and value reflected in response")
+    void create_admissionWithPasaporte_returnsResponseWithPassportIdentifier() {
         // Arrange
-        CreatePatientRequest request = requestWithAdditional(new PatientIdentifierRequest(2, "20351234568"));
+        CreatePatientRequest request = requestWith(new PatientIdentifierRequest(5, "AAB123456"));
         stubIcuAndBed();
-        PatientIdentityJpaEntity savedIdentity = buildIdentityEntity(IDENTITY_ID, List.of(
-                buildIdentifier(DNI_VALUE, dniType),
-                buildIdentifier("20351234568", cuilType)));
-        when(identifierTypeRepository.findAllById(List.of(1, 2))).thenReturn(List.of(dniType, cuilType));
+        PatientIdentityJpaEntity savedIdentity = buildIdentityEntity(IDENTITY_ID,
+                List.of(buildIdentifier("AAB123456", pasaporteType)));
+        when(identifierTypeRepository.findById(5)).thenReturn(Optional.of(pasaporteType));
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
@@ -178,10 +164,9 @@ class PatientIdentityServiceTest {
         PatientResponse response = service.create(request);
 
         // Assert
-        assertThat(response.dni()).isEqualTo(DNI_VALUE);
-        assertThat(response.additionalIdentifiers()).hasSize(1);
-        assertThat(response.additionalIdentifiers().get(0).typeName()).isEqualTo("CUIL");
-        assertThat(response.additionalIdentifiers().get(0).value()).isEqualTo("20351234568");
+        assertThat(response.identifier()).isNotNull();
+        assertThat(response.identifier().typeName()).isEqualTo("Pasaporte");
+        assertThat(response.identifier().value()).isEqualTo("AAB123456");
     }
 
     @Test
@@ -190,8 +175,8 @@ class PatientIdentityServiceTest {
         // Arrange
         stubIcuAndBed();
         PatientIdentityJpaEntity savedIdentity = buildIdentityEntity(IDENTITY_ID,
-                List.of(buildIdentifier(DNI_VALUE, dniType)));
-        when(identifierTypeRepository.findAllById(any())).thenReturn(List.of(dniType));
+                List.of(buildIdentifier("35123456", dniType)));
+        when(identifierTypeRepository.findById(1)).thenReturn(Optional.of(dniType));
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
@@ -199,7 +184,7 @@ class PatientIdentityServiceTest {
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(savedPatient));
 
         // Act
-        service.create(minimalRequest());
+        service.create(requestWith(new PatientIdentifierRequest(1, "35123456")));
 
         // Assert — dirty-check: the same IcuBedJpaEntity instance was mutated to OCCUPIED
         assertThat(availableBed.getStatus()).isEqualTo(BedStatus.OCCUPIED);
@@ -212,7 +197,7 @@ class PatientIdentityServiceTest {
     void create_icuNotFound_throwsNotFoundException() {
         when(icuRepository.findById(ICU_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(minimalRequest()))
+        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
                 .isInstanceOf(BusinessLayerException.class)
                 .extracting(e -> ((BusinessLayerException) e).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
@@ -224,7 +209,7 @@ class PatientIdentityServiceTest {
         when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
         when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(minimalRequest()))
+        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
                 .isInstanceOf(BusinessLayerException.class)
                 .extracting(e -> ((BusinessLayerException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -238,7 +223,7 @@ class PatientIdentityServiceTest {
         when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
         when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(occupiedBed));
 
-        assertThatThrownBy(() -> service.create(minimalRequest()))
+        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
                 .isInstanceOf(BusinessLayerException.class)
                 .extracting(e -> ((BusinessLayerException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -252,7 +237,7 @@ class PatientIdentityServiceTest {
         when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
         when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(maintenanceBed));
 
-        assertThatThrownBy(() -> service.create(minimalRequest()))
+        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
                 .isInstanceOf(BusinessLayerException.class)
                 .extracting(e -> ((BusinessLayerException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -261,31 +246,12 @@ class PatientIdentityServiceTest {
     // ── create() — identifier guard failures ─────────────────────────────────
 
     @Test
-    @DisplayName("create — unknown additional identifier type ID — throws 400 Bad Request")
-    void create_unknownAdditionalIdentifierTypeId_throwsBadRequest() {
+    @DisplayName("create — unknown identifier type ID — throws 400 Bad Request")
+    void create_unknownIdentifierTypeId_throwsBadRequest() {
         stubIcuAndBed();
-        when(identifierTypeRepository.findAllById(List.of(1, 99999))).thenReturn(List.of(dniType));
+        when(identifierTypeRepository.findById(99999)).thenReturn(Optional.empty());
 
-        CreatePatientRequest request = requestWithAdditional(new PatientIdentifierRequest(99999, "???"));
-
-        assertThatThrownBy(() -> service.create(request))
-                .isInstanceOf(BusinessLayerException.class)
-                .extracting(e -> ((BusinessLayerException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("create — duplicate identifier type in additionalIdentifiers — throws 400 Bad Request")
-    void create_duplicateAdditionalIdentifierType_throwsBadRequest() {
-        stubIcuAndBed();
-        // Two CUIL entries submitted
-        CreatePatientRequest request = new CreatePatientRequest(
-                FIRST_NAME, LAST_NAME, BIRTH_DATE, DNI_VALUE, ICU_ID, BED_ID,
-                List.of(
-                        new PatientIdentifierRequest(2, "20351234568"),
-                        new PatientIdentifierRequest(2, "20999999999")));
-
-        assertThatThrownBy(() -> service.create(request))
+        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(99999, "???"))))
                 .isInstanceOf(BusinessLayerException.class)
                 .extracting(e -> ((BusinessLayerException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
@@ -294,17 +260,19 @@ class PatientIdentityServiceTest {
     // ── findById() ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("findById — existing patient — returns response with patientId, bedId, and DNI")
+    @DisplayName("findById — existing patient — returns response with patientId, bedId, and identifier")
     void findById_existingPatient_returnsFullResponse() {
         PatientIdentityJpaEntity identity = buildIdentityEntity(IDENTITY_ID,
-                List.of(buildIdentifier(DNI_VALUE, dniType)));
+                List.of(buildIdentifier("35123456", dniType)));
         PatientJpaEntity patient = buildPatientEntity(PATIENT_ID, icu, availableBed, identity);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(patient));
 
         PatientResponse response = service.findById(PATIENT_ID);
 
         assertThat(response.patientId()).isEqualTo(PATIENT_ID);
-        assertThat(response.dni()).isEqualTo(DNI_VALUE);
+        assertThat(response.identifier()).isNotNull();
+        assertThat(response.identifier().typeName()).isEqualTo("DNI");
+        assertThat(response.identifier().value()).isEqualTo("35123456");
         assertThat(response.bedId()).isEqualTo(BED_ID);
         assertThat(response.icuId()).isEqualTo(ICU_ID);
     }
@@ -328,14 +296,8 @@ class PatientIdentityServiceTest {
         when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(availableBed));
     }
 
-    private CreatePatientRequest minimalRequest() {
-        return new CreatePatientRequest(
-                FIRST_NAME, LAST_NAME, BIRTH_DATE, DNI_VALUE, ICU_ID, BED_ID, null);
-    }
-
-    private CreatePatientRequest requestWithAdditional(PatientIdentifierRequest... extras) {
-        return new CreatePatientRequest(
-                FIRST_NAME, LAST_NAME, BIRTH_DATE, DNI_VALUE, ICU_ID, BED_ID, List.of(extras));
+    private CreatePatientRequest requestWith(PatientIdentifierRequest identifier) {
+        return new CreatePatientRequest(FIRST_NAME, LAST_NAME, BIRTH_DATE, identifier, ICU_ID, BED_ID);
     }
 
     private PatientIdentityJpaEntity buildIdentityEntity(UUID id,
@@ -351,7 +313,7 @@ class PatientIdentityServiceTest {
 
     private PatientJpaEntity buildPatientEntity(UUID id, IcuJpaEntity icuEntity,
             IcuBedJpaEntity bed, PatientIdentityJpaEntity identity) {
-        PatientJpaEntity patient = PatientJpaEntity.builder()
+        return PatientJpaEntity.builder()
                 .id(id)
                 .icu(icuEntity)
                 .bed(bed)
@@ -359,7 +321,6 @@ class PatientIdentityServiceTest {
                 .clinicalStatus(ClinicalStatus.ADMITTED)
                 .admissionDate(OffsetDateTime.now())
                 .build();
-        return patient;
     }
 
     private PatientIdentifierJpaEntity buildIdentifier(String value,

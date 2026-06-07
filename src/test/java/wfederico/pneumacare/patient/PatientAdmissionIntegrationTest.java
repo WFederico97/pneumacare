@@ -36,8 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <ol>
  *   <li><strong>BDD Scenario 1</strong> — Happy path admission returns 201 with
  *       {@code patientId}, {@code bedId}, and {@code admissionDate}.</li>
- *   <li><strong>BDD Scenario 2</strong> — Missing/malformed DNI returns 400 with
- *       a field-level error in Spanish.</li>
+ *   <li><strong>BDD Scenario 2</strong> — Missing identifier object returns 400
+ *       with a field-level error.</li>
  *   <li><strong>BDD Scenario 3</strong> — AES-256-GCM encryption at rest:
  *       the {@code first_name} column in {@code patient_identities} must NOT
  *       contain plain text after a successful admission.</li>
@@ -93,6 +93,7 @@ class PatientAdmissionIntegrationTest {
     /**
      * Valid admission JSON using the deterministic ICU and bed UUIDs seeded by
      * {@link IcuTestDataSeeder} (which runs automatically in the {@code dev} profile).
+     * Identifier type 1 = DNI (seeded by {@code IdentifierTypeDataSeeder}).
      */
     private static String validAdmissionJson() {
         return """
@@ -100,7 +101,7 @@ class PatientAdmissionIntegrationTest {
                   "firstName": "Juan",
                   "lastName": "Pérez",
                   "birthDate": "1989-05-14",
-                  "dni": "35123456",
+                  "identifier": { "identifierTypeId": 1, "value": "35123456" },
                   "icuId": "%s",
                   "bedId": "%s"
                 }
@@ -121,15 +122,16 @@ class PatientAdmissionIntegrationTest {
                 .andExpect(jsonPath("$.data.bedId").value(IcuTestDataSeeder.BED_001_ID.toString()))
                 .andExpect(jsonPath("$.data.admissionDate").isNotEmpty())
                 .andExpect(jsonPath("$.data.clinicalStatus").value("ADMITTED"))
-                .andExpect(jsonPath("$.data.dni").value("35123456"))
+                .andExpect(jsonPath("$.data.identifier.typeName").value("DNI"))
+                .andExpect(jsonPath("$.data.identifier.value").value("35123456"))
                 .andExpect(jsonPath("$.data.firstName").value("Juan"));
     }
 
-    // ── BDD Scenario 2 — Missing DNI ──────────────────────────────────────────
+    // ── BDD Scenario 2 — Missing identifier ──────────────────────────────────
 
     @Test
-    @DisplayName("BDD Scenario 2a — missing dni returns 400 with Spanish field error")
-    void admitPatient_missingDni_returns400WithSpanishFieldError() throws Exception {
+    @DisplayName("BDD Scenario 2 — missing identifier object returns 400 with field error")
+    void admitPatient_missingIdentifier_returns400WithFieldError() throws Exception {
         String body = """
                 {
                   "firstName": "Juan",
@@ -145,30 +147,7 @@ class PatientAdmissionIntegrationTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.data.dni").value("El DNI es obligatorio"));
-    }
-
-    @Test
-    @DisplayName("BDD Scenario 2b — malformed DNI (letters) returns 400 with Spanish format error")
-    void admitPatient_malformedDni_returns400WithSpanishFormatError() throws Exception {
-        String body = """
-                {
-                  "firstName": "Juan",
-                  "lastName": "Pérez",
-                  "birthDate": "1989-05-14",
-                  "dni": "ABC12345",
-                  "icuId": "%s",
-                  "bedId": "%s"
-                }
-                """.formatted(IcuTestDataSeeder.ICU_ID, IcuTestDataSeeder.BED_001_ID);
-
-        mockMvc.perform(post("/api/v1/patients")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.data.dni")
-                        .value("El DNI debe tener entre 7 y 8 dígitos numéricos"));
+                .andExpect(jsonPath("$.data.identifier").exists());
     }
 
     // ── BDD Scenario 3 — AES ciphertext at rest ───────────────────────────────
@@ -182,7 +161,7 @@ class PatientAdmissionIntegrationTest {
                   "firstName": "Juan",
                   "lastName": "Pérez",
                   "birthDate": "1989-05-14",
-                  "dni": "35123457",
+                  "identifier": { "identifierTypeId": 1, "value": "35123457" },
                   "icuId": "%s",
                   "bedId": "%s"
                 }

@@ -18,10 +18,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import wfederico.pneumacare.patient.application.IcuBedService;
 import wfederico.pneumacare.patient.domain.BedStatus;
 import wfederico.pneumacare.patient.web.IcuBedsController;
+import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.security.SecurityConfig;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +49,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class IcuBedsControllerTest {
 
     private static final String URL = "/api/v1/icu-beds";
+    private static final UUID ICU_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID BED_ID_1 = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
+    private static final UUID BED_ID_2 = UUID.fromString("dddddddd-0000-0000-0000-000000000002");
 
     @Autowired
     private MockMvc mockMvc;
@@ -71,16 +77,18 @@ class IcuBedsControllerTest {
     @WithMockUser
     void getIcuBeds_authenticatedUser_returns200WithList() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of(
-                new IcuBedResponse("BED-001", BedStatus.AVAILABLE),
-                new IcuBedResponse("BED-002", BedStatus.OCCUPIED)
+                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE),
+                new IcuBedResponse(BED_ID_2, "BED-002", BedStatus.OCCUPIED)
         ));
 
         mockMvc.perform(get(URL).accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.message").value("Camas de UCI recuperadas exitosamente"))
+                .andExpect(jsonPath("$.data[0].bedId").value(BED_ID_1.toString()))
                 .andExpect(jsonPath("$.data[0].bedNumber").value("BED-001"))
                 .andExpect(jsonPath("$.data[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.data[1].bedId").value(BED_ID_2.toString()))
                 .andExpect(jsonPath("$.data[1].bedNumber").value("BED-002"))
                 .andExpect(jsonPath("$.data[1].status").value("OCCUPIED"));
     }
@@ -102,12 +110,37 @@ class IcuBedsControllerTest {
     @DisplayName("getIcuBeds_noAuthenticationInDev_returns200")
     void getIcuBeds_noAuthenticationInDev_returns200() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of(
-                new IcuBedResponse("BED-001", BedStatus.AVAILABLE)
+                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE)
         ));
 
         mockMvc.perform(get(URL).accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data[0].bedId").value(BED_ID_1.toString()))
                 .andExpect(jsonPath("$.data[0].bedNumber").value("BED-001"));
+    }
+
+    @Test
+    @DisplayName("createIcuBed_validRequest_returns201")
+    @WithMockUser
+    void createIcuBed_validRequest_returns201() throws Exception {
+        when(service.create(any(CreateIcuBedRequest.class))).thenReturn(
+                new IcuBedResponse(BED_ID_1, "BED-004", BedStatus.AVAILABLE));
+
+        String body = """
+                {
+                  "bedNumber": "BED-004"
+                }
+                """;
+
+        mockMvc.perform(post(URL)
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value(201))
+                .andExpect(jsonPath("$.message").value("Cama de UCI creada exitosamente"))
+                .andExpect(jsonPath("$.data.bedId").value(BED_ID_1.toString()))
+                .andExpect(jsonPath("$.data.bedNumber").value("BED-004"))
+                .andExpect(jsonPath("$.data.status").value("AVAILABLE"));
     }
 }

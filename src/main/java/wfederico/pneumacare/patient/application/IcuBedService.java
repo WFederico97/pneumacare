@@ -10,7 +10,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import wfederico.pneumacare.patient.domain.BedStatus;
+import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedRepository;
+import wfederico.pneumacare.patient.infrastructure.persistence.IcuJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.IcuRepository;
+import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
@@ -34,6 +38,7 @@ public class IcuBedService {
     private static final List<BedStatus> DASHBOARD_STATUSES = List.of(BedStatus.AVAILABLE, BedStatus.OCCUPIED);
 
     private final IcuBedRepository icuBedRepository;
+    private final IcuRepository icuRepository;
     private final Environment environment;
 
     @Value("${app.security.dev-default-icu-id:cccccccc-0000-0000-0000-000000000001}")
@@ -53,6 +58,20 @@ public class IcuBedService {
                 .stream()
                 .map(IcuBedResponse::from)
                 .toList();
+    }
+
+    public IcuBedResponse create(CreateIcuBedRequest request) {
+        UUID icuId = extractIcuIdFromAuthentication();
+        IcuJpaEntity icu = icuRepository.findById(icuId)
+                .orElseThrow(() -> new BusinessLayerException("No se encontró la UCI con id: " + icuId, HttpStatus.NOT_FOUND));
+
+        IcuBedJpaEntity bed = IcuBedJpaEntity.builder()
+                .icu(icu)
+                .bedNumber(request.bedNumber().trim())
+                .status(BedStatus.AVAILABLE)
+                .build();
+
+        return IcuBedResponse.from(icuBedRepository.save(bed));
     }
 
     /**

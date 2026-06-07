@@ -20,16 +20,6 @@ public final class ExceptionMessageConstants {
 
     // ── Patient admission ────────────────────────────────────────────────────
 
-    /** DNI field is required. */
-    public static final String DNI_REQUIRED = "El DNI es obligatorio";
-
-    /** DNI value does not match the expected 7–8-digit format. */
-    public static final String DNI_INVALID_FORMAT = "El DNI debe tener entre 7 y 8 dígitos numéricos";
-
-    /** A DNI identifier must not be included in the additionalIdentifiers list. */
-    public static final String DNI_NOT_ALLOWED_IN_ADDITIONAL =
-            "El DNI no debe incluirse en los identificadores adicionales; utilice el campo 'dni'";
-
     /** The requested ICU does not exist. */
     public static final String ICU_NOT_FOUND = "No se encontró la UCI con id: ";
 

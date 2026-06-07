@@ -10,4 +10,5 @@ public final class RequestMessageConstants {
     public static final String CSTAT_CALCULATED      = "Cstat calculado";
     public static final String EVALUATION_PERSISTED  = "Evaluación registrada exitosamente";
     public static final String ICU_BEDS_RETRIEVED    = "Camas de UCI recuperadas exitosamente";
+    public static final String ICU_BED_CREATED       = "Cama de UCI creada exitosamente";
 }

@@ -18,6 +18,9 @@ import wfederico.pneumacare.patient.application.IcuBedService;
 import wfederico.pneumacare.patient.domain.BedStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedRepository;
+import wfederico.pneumacare.patient.infrastructure.persistence.IcuJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.IcuRepository;
+import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
@@ -26,6 +29,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -35,9 +39,13 @@ import static org.mockito.Mockito.when;
 class IcuBedServiceTest {
 
     private static final UUID ICU_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
+    private static final UUID BED_ID = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
 
     @Mock
     private IcuBedRepository icuBedRepository;
+
+    @Mock
+    private IcuRepository icuRepository;
 
     @Mock
     private Environment environment;
@@ -62,8 +70,8 @@ class IcuBedServiceTest {
         setJwtAuthWithIcuId(ICU_ID.toString());
 
         List<IcuBedJpaEntity> beds = List.of(
-                IcuBedJpaEntity.builder().bedNumber("BED-001").status(BedStatus.AVAILABLE).build(),
-                IcuBedJpaEntity.builder().bedNumber("BED-002").status(BedStatus.OCCUPIED).build()
+                IcuBedJpaEntity.builder().id(BED_ID).bedNumber("BED-001").status(BedStatus.AVAILABLE).build(),
+                IcuBedJpaEntity.builder().id(UUID.fromString("dddddddd-0000-0000-0000-000000000002")).bedNumber("BED-002").status(BedStatus.OCCUPIED).build()
         );
         when(icuBedRepository.findByIcu_IdAndStatusInOrderByBedNumberAsc(
                 eq(ICU_ID), eq(List.of(BedStatus.AVAILABLE, BedStatus.OCCUPIED))))
@@ -72,6 +80,7 @@ class IcuBedServiceTest {
         List<IcuBedResponse> result = service.findBedsForAuthenticatedIcu();
 
         assertThat(result).hasSize(2);
+        assertThat(result.get(0).bedId()).isEqualTo(BED_ID);
         assertThat(result.get(0).bedNumber()).isEqualTo("BED-001");
         assertThat(result.get(0).status()).isEqualTo(BedStatus.AVAILABLE);
         assertThat(result.get(1).bedNumber()).isEqualTo("BED-002");
@@ -130,6 +139,42 @@ class IcuBedServiceTest {
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    @DisplayName("create_validRequest_returnsCreatedBed")
+    void create_validRequest_returnsCreatedBed() {
+        setJwtAuthWithIcuId(ICU_ID.toString());
+        CreateIcuBedRequest request = new CreateIcuBedRequest("BED-004");
+        IcuJpaEntity icu = IcuJpaEntity.builder().id(ICU_ID).build();
+        IcuBedJpaEntity saved = IcuBedJpaEntity.builder()
+                .id(BED_ID)
+                .icu(icu)
+                .bedNumber("BED-004")
+                .status(BedStatus.AVAILABLE)
+                .build();
+
+        when(icuRepository.findById(ICU_ID)).thenReturn(java.util.Optional.of(icu));
+        when(icuBedRepository.save(any(IcuBedJpaEntity.class))).thenReturn(saved);
+
+        IcuBedResponse response = service.create(request);
+
+        assertThat(response.bedId()).isEqualTo(BED_ID);
+        assertThat(response.bedNumber()).isEqualTo("BED-004");
+        assertThat(response.status()).isEqualTo(BedStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("create_unknownIcu_throwsBusinessException404")
+    void create_unknownIcu_throwsBusinessException404() {
+        setJwtAuthWithIcuId(ICU_ID.toString());
+        CreateIcuBedRequest request = new CreateIcuBedRequest("BED-004");
+        when(icuRepository.findById(ICU_ID)).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     private void setJwtAuthWithIcuId(String icuIdClaim) {
