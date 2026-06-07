@@ -6,6 +6,10 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -34,6 +38,32 @@ import wfederico.pneumacare.shared.web.ApiResponseBase;
 public class GlobalExceptionHandler {
 
     private static final String GENERIC_SERVER_ERROR = "Error interno del servidor";
+
+    /**
+     * Handles {@link AccessDeniedException} thrown by {@code @PreAuthorize} AOP proxies.
+     *
+     * <p>Returns 401 when the requester is anonymous (no authentication token or
+     * {@link AnonymousAuthenticationToken}), and 403 when the requester is authenticated
+     * but lacks the required role/authority.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponseBase<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAnonymous = auth == null || auth instanceof AnonymousAuthenticationToken;
+
+        int status = isAnonymous ? 401 : 403;
+        String message = isAnonymous ? "No autenticado" : "Acceso denegado";
+
+        log.warn("Access denied: anonymous={}, reason={}", isAnonymous, ex.getMessage());
+
+        String traceId = MDC.get("traceId");
+        ApiResponseBase<Void> response = ApiResponseBase.<Void>builder()
+                .status(status)
+                .message(message)
+                .traceId(traceId)
+                .build();
+        return ResponseEntity.status(status).body(response);
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponseBase<Void>> handleGenericException(Exception ex) {
