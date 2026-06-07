@@ -1,5 +1,7 @@
 # Development profile
 app:
+  security:
+    dev-default-icu-id: cccccccc-0000-0000-0000-000000000001
   cors:
     allowed-origins:
       - http://localhost:4200
