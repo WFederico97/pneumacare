@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,18 +29,19 @@ import wfederico.pneumacare.shared.web.ApiResponseBase;
 import java.util.UUID;
 
 /**
- * REST controller for patient identity management.
+ * REST controller for patient admission and identity management.
  *
  * <p>PII fields are always plain text in the request/response payloads —
  * AES-256-GCM encryption and decryption are handled transparently by the
- * JPA persistence layer.
+ * JPA persistence layer ({@link wfederico.pneumacare.shared.security.encryption.AesAttributeConverter}).
  *
  * <h2>Security note</h2>
  * In {@code staging}/{@code prod} profiles these endpoints require OAuth2 scopes:
  * {@code SCOPE_write} for {@code POST}, {@code SCOPE_read} for {@code GET}.
  * In the {@code dev} profile all endpoints are open ({@code permitAll}).
  */
-@Tag(name = "Patients", description = "Patient registration and PII identity management")
+@Tag(name = "Patients", description = "Patient admission and PII identity management")
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/patients")
 @RequiredArgsConstructor
@@ -48,17 +50,22 @@ public class PatientController {
     private final PatientIdentityService service;
 
     @Operation(
-            summary = "Register a new patient",
+            summary = "Admit a new patient",
             description = """
-                    Creates a patient identity record with one or more structured identifiers \
-                    (DNI, CUIL, CUIT, Passport, etc.).
+                    Admits a patient to the ICU in a single atomic transaction:
 
-                    **PII fields** (`firstName`, `lastName`, and each identifier `value`) are \
-                    stored encrypted at rest using AES-256-GCM with a random 12-byte IV per write. \
-                    The response always returns plain text — decryption is transparent.
+                    1. Validates the ICU and bed (bed must belong to the ICU and be **AVAILABLE**).
+                    2. Creates a `patient_identities` PII record with the given name, birth date, and \
+                    DNI (plus any additional identifiers). All PII values are stored \
+                    **AES-256-GCM encrypted at rest**.
+                    3. Creates the operational `patients` record linking identity, ICU, and bed.
+                    4. Marks the bed **OCCUPIED**.
 
-                    Obtain valid `identifierTypeId` values from `GET /api/v1/identifier-types` \
-                    before calling this endpoint.
+                    On any failure the whole transaction is rolled back.
+
+                    Obtain valid `icuId` values from `GET /api/v1/icus` and valid \
+                    `identifierTypeId` values (for additional identifiers) from \
+                    `GET /api/v1/identifier-types`.
 
                     **Required scope (staging/prod):** `SCOPE_write` — open in dev.
                     """,
@@ -67,77 +74,103 @@ public class PatientController {
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
                             schema = @Schema(implementation = CreatePatientRequest.class),
-                            examples = @ExampleObject(
-                                    name = "DNI example",
-                                    summary = "Patient with a single DNI identifier",
-                                    value = """
-                                            {
-                                              "firstName": "Juan",
-                                              "lastName": "Pérez",
-                                              "birthDate": "1989-05-14",
-                                              "identifiers": [
-                                                { "identifierTypeId": 1, "value": "35123456" }
-                                              ]
-                                            }
-                                            """))))
+                            examples = {
+                                    @ExampleObject(
+                                            name = "DNI only",
+                                            summary = "Minimal admission with DNI only",
+                                            value = """
+                                                    {
+                                                      "firstName": "Juan",
+                                                      "lastName": "Pérez",
+                                                      "birthDate": "1989-05-14",
+                                                      "dni": "35123456",
+                                                      "icuId": "cccccccc-0000-0000-0000-000000000001",
+                                                      "bedId": "dddddddd-0000-0000-0000-000000000001"
+                                                    }
+                                                    """),
+                                    @ExampleObject(
+                                            name = "DNI + CUIL",
+                                            summary = "Admission with DNI and additional CUIL identifier",
+                                            value = """
+                                                    {
+                                                      "firstName": "María",
+                                                      "lastName": "González",
+                                                      "birthDate": "1975-11-22",
+                                                      "dni": "12345678",
+                                                      "icuId": "cccccccc-0000-0000-0000-000000000001",
+                                                      "bedId": "dddddddd-0000-0000-0000-000000000002",
+                                                      "additionalIdentifiers": [
+                                                        { "identifierTypeId": 2, "value": "27-12345678-4" }
+                                                      ]
+                                                    }
+                                                    """)
+                            })))
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Patient registered successfully.",
+                    description = "Patient admitted successfully.",
                     content = @Content(
                             mediaType = MediaType.APPLICATION_JSON_VALUE,
                             examples = @ExampleObject(
                                     value = """
                                             {
                                               "status": 201,
-                                              "message": "Patient registered successfully",
+                                              "message": "Patient admitted successfully",
                                               "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
                                               "data": {
-                                                "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+                                                "patientId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                                                 "firstName": "Juan",
                                                 "lastName": "Pérez",
                                                 "birthDate": "1989-05-14",
-                                                "identifiers": [
-                                                  { "typeName": "DNI", "value": "35123456" }
-                                                ]
+                                                "dni": "35123456",
+                                                "icuId": "cccccccc-0000-0000-0000-000000000001",
+                                                "bedId": "dddddddd-0000-0000-0000-000000000001",
+                                                "admissionDate": "2026-06-06T10:00:00-03:00",
+                                                "clinicalStatus": "ADMITTED",
+                                                "additionalIdentifiers": []
                                               }
                                             }
                                             """))),
             @ApiResponse(
                     responseCode = "400",
                     description = "Validation error — one or more fields failed validation " +
-                            "(blank name, missing birthDate, empty identifiers list, " +
-                            "unknown identifierTypeId, etc.).",
+                            "(blank name, missing/malformed DNI, missing icuId/bedId, " +
+                            "bed not found, bed not AVAILABLE, duplicate identifier type, etc.).",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
             @ApiResponse(
                     responseCode = "401",
                     description = "Authentication required. Provide a valid Bearer token with " +
                             "scope `SCOPE_write` (staging/prod only).",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "ICU not found.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
     @PostMapping
     public ResponseEntity<ApiResponseBase<PatientResponse>> createPatient(
             @Valid @RequestBody CreatePatientRequest request) {
 
+        log.debug("Patient admission requested: icuId={}, bedId={}", request.icuId(), request.bedId());
         PatientResponse data = service.create(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponseBase.<PatientResponse>builder()
                         .status(HttpStatus.CREATED.value())
-                        .message("Patient registered successfully")
+                        .message("Patient admitted successfully")
                         .data(data)
                         .traceId(MDC.get("traceId"))
                         .build());
     }
 
     @Operation(
-            summary = "Get patient by ID",
+            summary = "Get admitted patient by ID",
             description = """
-                    Retrieves a patient identity record by its UUID.
+                    Retrieves an admitted patient by their operational UUID ({@code patients.id}).
 
-                    PII fields (`firstName`, `lastName`, and each identifier `value`) are \
-                    decrypted transparently from AES-256-GCM storage before the response is sent. \
-                    Callers always receive plain text.
+                    PII fields ({@code firstName}, {@code lastName}, {@code dni}, and any \
+                    additional identifier values) are decrypted transparently from AES-256-GCM \
+                    storage before the response is sent. Callers always receive plain text.
 
                     **Required scope (staging/prod):** `SCOPE_read` — open in dev.
                     """)
@@ -154,13 +187,16 @@ public class PatientController {
                                               "message": "Patient retrieved successfully",
                                               "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
                                               "data": {
-                                                "id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+                                                "patientId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                                                 "firstName": "Juan",
                                                 "lastName": "Pérez",
                                                 "birthDate": "1989-05-14",
-                                                "identifiers": [
-                                                  { "typeName": "DNI", "value": "35123456" }
-                                                ]
+                                                "dni": "35123456",
+                                                "icuId": "cccccccc-0000-0000-0000-000000000001",
+                                                "bedId": "dddddddd-0000-0000-0000-000000000001",
+                                                "admissionDate": "2026-06-06T10:00:00-03:00",
+                                                "clinicalStatus": "ADMITTED",
+                                                "additionalIdentifiers": []
                                               }
                                             }
                                             """))),
@@ -171,12 +207,13 @@ public class PatientController {
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
             @ApiResponse(
                     responseCode = "404",
-                    description = "No patient found with the given UUID.",
+                    description = "No admitted patient found with the given UUID.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseBase<PatientResponse>> getPatient(
-            @Parameter(description = "UUID of the patient identity record.", example = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+            @Parameter(description = "Operational patient UUID (patients.id).",
+                    example = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
             @PathVariable UUID id) {
 
         PatientResponse data = service.findById(id);

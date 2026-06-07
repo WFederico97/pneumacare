@@ -9,10 +9,30 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
     <!--
-        Standard Spring Boot coloured console appender.
-        Outputs: [pneumacare,<traceId>,<spanId>] level  logger  - message
+        PII safety-net: registers %safeMsg as a custom conversion word.
+        PiiRedactingConverter scans every formatted message for standalone
+        7-or-8-digit sequences (Argentine DNI pattern) and replaces them
+        with [DNI-REDACTED] before the line is written to the CONSOLE.
+
+        This is a last-resort defence-in-depth measure. The primary control
+        is PiiMaskingUtil used explicitly in every log statement that touches
+        patient data.
     -->
-    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+    <conversionRule conversionWord="safeMsg"
+                    class="wfederico.pneumacare.shared.logging.PiiRedactingConverter"/>
+
+    <!--
+        PII-safe console appender.
+        Identical to Spring Boot's default CONSOLE appender but replaces
+        %msg with %safeMsg so every log line passes through
+        PiiRedactingConverter before being written to stdout.
+    -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN:-%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %safeMsg%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
 
     <!--
         OpenTelemetry Logback bridge.
@@ -26,6 +46,11 @@
         captureMdcAttributes   – forwards traceId and spanId (populated by the
                                  Spring Boot / Micrometer tracing bridge) so that
                                  Loki can link a log line back to its Tempo trace.
+
+        IMPORTANT: This appender calls ILoggingEvent.getFormattedMessage()
+        directly and therefore bypasses PiiRedactingConverter.
+        PII protection for OTel log records relies on PiiMaskingUtil being
+        used explicitly in every log statement that touches patient data.
     -->
     <appender name="OpenTelemetry"
               class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
