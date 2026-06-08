@@ -13,7 +13,6 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,11 +31,9 @@ import wfederico.pneumacare.shared.web.ApiResponseBase;
  * and returns the immutable evaluation record with computed clinical index snapshots.
  *
  * <h2>Security</h2>
- * Access is restricted to authenticated users with {@code ROLE_THERAPIST}
- * via {@code @PreAuthorize}. In {@code staging}/{@code prod} the role is derived
- * from the OAuth2 JWT claims. In the {@code dev} profile no JWT is required by the
- * filter chain, but the {@code @PreAuthorize} check still fires — use
- * {@code @WithMockUser(roles = "THERAPIST")} in tests.
+ * In {@code dev} the filter chain grants {@code permitAll()} to {@code /api/**} —
+ * no token is required. In {@code staging}/{@code prod} the filter chain enforces
+ * {@code SCOPE_write} on all {@code POST /api/**} requests via the OAuth2 JWT.
  *
  * <p>This controller intentionally uses the same base path
  * ({@code /api/v1/evaluations}) as {@link ClinicalEvaluationController} but
@@ -133,7 +130,6 @@ public class EvaluationController {
                             "(staging/prod only).",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
-    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<EvaluationResponse>> createEvaluation(
             @Valid @RequestBody CreateEvaluationRequest request) {

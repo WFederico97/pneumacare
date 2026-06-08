@@ -10,10 +10,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import wfederico.pneumacare.patient.domain.BedStatus;
+import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedRepository;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuRepository;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
 import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
@@ -39,6 +42,7 @@ public class IcuBedService {
 
     private final IcuBedRepository icuBedRepository;
     private final IcuRepository icuRepository;
+    private final PatientRepository patientRepository;
     private final Environment environment;
 
     @Value("${app.security.dev-default-icu-id:cccccccc-0000-0000-0000-000000000001}")
@@ -56,7 +60,16 @@ public class IcuBedService {
 
         return icuBedRepository.findByIcu_IdAndStatusInOrderByBedNumberAsc(icuId, DASHBOARD_STATUSES)
                 .stream()
-                .map(IcuBedResponse::from)
+                .map(bed -> {
+                    UUID patientId = null;
+                    if (bed.getStatus() == BedStatus.OCCUPIED) {
+                        patientId = patientRepository
+                                .findByBed_IdAndClinicalStatus(bed.getId(), ClinicalStatus.ADMITTED)
+                                .map(PatientJpaEntity::getId)
+                                .orElse(null);
+                    }
+                    return IcuBedResponse.from(bed, patientId);
+                })
                 .toList();
     }
 

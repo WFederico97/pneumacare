@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import wfederico.pneumacare.patient.domain.ClinicalStatus;
+
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,4 +51,14 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
      * @return the patient linked to that identity, or empty if none exists
      */
     Optional<PatientJpaEntity> findByIdentity_Id(UUID identityId);
+
+    /**
+     * Looks up the patient currently occupying the given bed with the given clinical status.
+     * Used to enrich the {@code IcuBedResponse} with the admitted patient's UUID.
+     *
+     * @param bedId          the UUID of the {@code icu_beds} record
+     * @param clinicalStatus the status to filter on (typically {@code ADMITTED})
+     * @return the matching patient, or empty if none
+     */
+    Optional<PatientJpaEntity> findByBed_IdAndClinicalStatus(UUID bedId, ClinicalStatus clinicalStatus);
 }

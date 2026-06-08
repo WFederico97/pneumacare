@@ -16,10 +16,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.util.ReflectionTestUtils;
 import wfederico.pneumacare.patient.application.IcuBedService;
 import wfederico.pneumacare.patient.domain.BedStatus;
+import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedRepository;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuRepository;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
 import wfederico.pneumacare.patient.web.dto.CreateIcuBedRequest;
 import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
@@ -48,6 +50,9 @@ class IcuBedServiceTest {
     private IcuRepository icuRepository;
 
     @Mock
+    private PatientRepository patientRepository;
+
+    @Mock
     private Environment environment;
 
     @InjectMocks
@@ -62,6 +67,8 @@ class IcuBedServiceTest {
     void setDefaults() {
         ReflectionTestUtils.setField(service, "devDefaultIcuId", ICU_ID.toString());
         lenient().when(environment.matchesProfiles("dev")).thenReturn(false);
+        lenient().when(patientRepository.findByBed_IdAndClinicalStatus(any(UUID.class), eq(ClinicalStatus.ADMITTED)))
+                .thenReturn(java.util.Optional.empty());
     }
 
     @Test

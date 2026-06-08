@@ -47,13 +47,12 @@ import org.springframework.http.HttpStatus;
  * <p>{@link SecurityConfig} is imported explicitly so that
  * {@code @EnableMethodSecurity} and {@code devSecurityFilterChain} are active.
  * The {@code dev} profile activates {@code devSecurityFilterChain} which grants
- * {@code permitAll()} to {@code /api/**} at the filter-chain level, but
- * {@code @PreAuthorize("hasRole('THERAPIST')")} still fires at the method level.
+ * {@code permitAll()} to {@code /api/**} — no role or token is required.
  *
  * <h3>BDD scenarios covered</h3>
  * <ul>
  *   <li>Scenario 1 — valid payload + THERAPIST role → 201 with rsbi_snapshot</li>
- *   <li>Scenario 2 — no auth header (anonymous) → 401</li>
+ *   <li>Scenario 2 — no auth header (anonymous, dev profile) → 201</li>
  *   <li>Scenario 3 — missing {@code pao2} → 400 with field error</li>
  *   <li>Extra — pplat ≤ peep (service throws 400) → propagates 400</li>
  *   <li>Extra — THERAPIST role but missing {@code patientId} → 400</li>
@@ -93,6 +92,7 @@ class EvaluationControllerTest {
               "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
               "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
               "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+              "brand": "TECME",
               "f":    15,
               "vt":   500,
               "pao2": 85,
@@ -154,15 +154,39 @@ class EvaluationControllerTest {
                 .andExpect(jsonPath("$.data.createdBy").value(CREATED_BY.toString()));
     }
 
-    // ── Scenario 2: unauthorized (no auth header) ─────────────────────────
+    // ── Scenario 2: no auth header — dev profile permits anonymous ────────
 
     @Test
-    @DisplayName("createEvaluation_noAuthHeader_returns401")
-    void createEvaluation_noAuth_returns401() throws Exception {
+    @DisplayName("createEvaluation_noAuthHeader_devProfile_returns201")
+    void createEvaluation_noAuth_devProfile_returns201() throws Exception {
+        EvaluationResponse stub = new EvaluationResponse(
+                UUID.randomUUID(),
+                PATIENT_ID,
+                SHIFT_ID,
+                VENTILATOR_ID,
+                OffsetDateTime.now(),
+                new BigDecimal("15"),
+                new BigDecimal("500"),
+                new BigDecimal("85"),
+                new BigDecimal("0.40"),
+                new BigDecimal("25"),
+                new BigDecimal("5"),
+                new BigDecimal("30.00"),
+                RsbiInterpretation.FAVORABLE,
+                new BigDecimal("212.50"),
+                PafiClassification.MILD_ARDS,
+                new BigDecimal("25.00"),
+                CstatInterpretation.LOW,
+                false,
+                CREATED_BY);
+
+        when(service.create(any())).thenReturn(stub);
+
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value(201));
     }
 
     // ── Scenario 3: missing pao2 → 400 ────────────────────────────────────
@@ -176,6 +200,7 @@ class EvaluationControllerTest {
                   "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                   "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
                   "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "brand": "TECME",
                   "f":    15,
                   "vt":   500,
                   "fio2": 0.40,
@@ -192,21 +217,22 @@ class EvaluationControllerTest {
                 .andExpect(jsonPath("$.data.pao2").exists());
     }
 
-    // ── Extra: pplat ≤ peep → service throws 400 ─────────────────────────
+    // ── Extra: pplat ≤ peep → DTO @AssertTrue rejects with field-level 400 ─
 
     @Test
-    @DisplayName("createEvaluation_pplatLessThanOrEqualPeep_returns400")
+    @DisplayName("createEvaluation_pplatLessThanOrEqualPeep_returns400WithPplatFieldError")
     @WithMockUser(roles = "THERAPIST")
     void createEvaluation_pplatLessThanPeep_returns400() throws Exception {
-        when(service.create(any()))
-                .thenThrow(new BusinessLayerException(
-                        "La presión meseta debe ser mayor que el PEEP total", HttpStatus.BAD_REQUEST));
-
+        // pplat == peep — the DTO's @AssertTrue isPplatGreaterThanPeep() catches
+        // this before the request ever reaches the service. The bean-validation
+        // path produces a per-field error map keyed on "pplatGreaterThanPeep"
+        // (the property name derived from the validator method).
         String bodyBadPressures = """
                 {
                   "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                   "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
                   "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "brand": "TECME",
                   "f":    15,
                   "vt":   500,
                   "pao2": 85,
@@ -220,7 +246,8 @@ class EvaluationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bodyBadPressures))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.data.pplatGreaterThanPeep").exists());
     }
 
     // ── Extra: missing patientId → 400 ────────────────────────────────────
@@ -233,6 +260,7 @@ class EvaluationControllerTest {
                 {
                   "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
                   "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "brand": "TECME",
                   "f":    15,
                   "vt":   500,
                   "pao2": 85,
@@ -260,6 +288,7 @@ class EvaluationControllerTest {
                   "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                   "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
                   "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "brand": "TECME",
                   "f":    99,
                   "vt":   500,
                   "pao2": 85,
@@ -274,5 +303,61 @@ class EvaluationControllerTest {
                         .content(bodyBadF))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.f").exists());
+    }
+
+    // ── Extra: missing brand → 400 ────────────────────────────────────────
+
+    @Test
+    @DisplayName("createEvaluation_missingBrand_returns400WithBrandFieldError")
+    @WithMockUser(roles = "THERAPIST")
+    void createEvaluation_missingBrand_returns400() throws Exception {
+        String bodyMissingBrand = """
+                {
+                  "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+                  "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
+                  "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "f":    15,
+                  "vt":   500,
+                  "pao2": 85,
+                  "fio2": 0.40,
+                  "pplat": 25,
+                  "peep":   5
+                }
+                """;
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyMissingBrand))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.data.brand").exists());
+    }
+
+    // ── Extra: invalid brand → 400 ────────────────────────────────────────
+
+    @Test
+    @DisplayName("createEvaluation_unknownBrand_returns400")
+    @WithMockUser(roles = "THERAPIST")
+    void createEvaluation_unknownBrand_returns400() throws Exception {
+        String bodyUnknownBrand = """
+                {
+                  "patientId":            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+                  "shiftId":              "bbbbbbbb-0000-0000-0000-000000000001",
+                  "physicalVentilatorId": "cccccccc-0000-0000-0000-000000000001",
+                  "brand": "PUREMA",
+                  "f":    15,
+                  "vt":   500,
+                  "pao2": 85,
+                  "fio2": 0.40,
+                  "pplat": 25,
+                  "peep":   5
+                }
+                """;
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyUnknownBrand))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
     }
 }

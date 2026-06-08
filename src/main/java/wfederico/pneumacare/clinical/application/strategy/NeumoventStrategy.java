@@ -14,19 +14,28 @@ import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.Rs
 /**
  * Neumovent ventilator brand strategy.
  *
- * <p>Neumovent hardware reports tidal volume in <em>litres (L)</em>, which
- * differs from the TECME baseline that uses millilitres. The unit conversions
- * applied here are:
+ * <p>Receives the canonical {@link VentilatorReading} where {@code tidalVolume}
+ * is expressed in <strong>millilitres (mL)</strong> — the same unit convention
+ * used by every other brand strategy. The HTTP boundary
+ * ({@link wfederico.pneumacare.clinical.web.dto.CreateEvaluationRequest})
+ * always carries {@code vt} in mL regardless of brand, so no per-brand unit
+ * translation happens in the application service.
  *
+ * <p><b>Unit handling:</b>
  * <ul>
- *   <li><b>RSBI</b> — formula expects tidal volume in litres; Neumovent
- *       supplies it in litres already, so {@code tidalVolume} is passed
- *       directly with no conversion.</li>
- *   <li><b>Cstat</b> — formula expects tidal volume in millilitres; this
- *       strategy multiplies {@code tidalVolume} by {@value #L_TO_ML} before
- *       delegating to the math engine.</li>
+ *   <li><b>RSBI</b> — formula expects tidal volume in <em>litres</em>; this
+ *       strategy divides {@code tidalVolume} (mL) by {@value #ML_PER_LITER}.</li>
+ *   <li><b>Cstat</b> — formula expects tidal volume in <em>millilitres</em>;
+ *       no conversion applied.</li>
  *   <li><b>PaFi</b> — no tidal-volume input; delegated unchanged.</li>
  * </ul>
+ *
+ * <p><b>Why this currently mirrors {@link TecmeStrategy}:</b> the application
+ * accepts manual data entry in mL for both brands, so the unit-conversion path
+ * is the same. Brand-specific divergence is expected to appear once
+ * {@code extendedParameters} processing differs (e.g., {@code inspTime} for
+ * Neumovent vs {@code triggerFlow} for TECME), or when real hardware
+ * integrations introduce sensor-specific corrections.
  *
  * <p>All other validations (plateau pressure &gt; PEEP total, positive rates)
  * are enforced by {@link ClinicalMathEngine} and propagated as
@@ -35,23 +44,23 @@ import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.Rs
 @Component
 public class NeumoventStrategy implements VentilatorStrategy {
 
-    /** Conversion factor: litres to millilitres. */
-    private static final double L_TO_ML = 1000.0;
+    /** Conversion factor: millilitres per litre. */
+    private static final double ML_PER_LITER = 1000.0;
 
     @Override
     public VentilatorEvaluationResult evaluate(VentilatorReading reading) {
-        // Neumovent supplies tidalVolume in L — RSBI uses L directly, no conversion.
+        // RSBI formula expects tidal volume in L; canonical reading is mL.
         double rsbi = ClinicalMathEngine.calculateRsbi(
                 reading.respiratoryRate(),
-                reading.tidalVolume());
+                reading.tidalVolume() / ML_PER_LITER);
 
         double pafi = ClinicalMathEngine.calculatePafi(
                 reading.pao2(),
                 reading.fio2());
 
-        // Cstat formula requires mL; convert L → mL.
+        // Cstat formula expects tidal volume in mL; canonical reading is mL.
         double cstat = ClinicalMathEngine.calculateCstat(
-                reading.tidalVolume() * L_TO_ML,
+                reading.tidalVolume(),
                 reading.plateauPressure(),
                 reading.peepTotal());
 

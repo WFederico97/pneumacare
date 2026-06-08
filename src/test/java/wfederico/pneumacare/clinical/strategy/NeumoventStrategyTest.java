@@ -19,13 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 class NeumoventStrategyTest {
 
-    // ── Reading: rr=20, tv=0.5L, pao2=400, fio2=1.0, pplat=20, peep=5 ───────
-    //   Neumovent-specific: tidalVolume is in LITRES (not mL as in TECME)
-    //   RSBI  = 20 / 0.5 L                  = 40.0       → FAVORABLE
-    //   PaFi  = 400 / 1.0                   = 400.0      → NORMAL
-    //   Cstat = (0.5 L × 1000) / (20 - 5)  = 33.333...  → LOW
+    // ── Reading: rr=20, tv=500mL, pao2=400, fio2=1.0, pplat=20, peep=5 ──────
+    //   Canonical convention: tidalVolume is mL for every brand strategy.
+    //   RSBI  = 20 / (500/1000) = 40.0       → FAVORABLE
+    //   PaFi  = 400 / 1.0       = 400.0      → NORMAL
+    //   Cstat = 500 / (20-5)    = 33.333...  → LOW
     private static final VentilatorReading NEUMOVENT_READING =
-            new VentilatorReading(20.0, 0.5, 400.0, 1.0, 20.0, 5.0);
+            new VentilatorReading(20.0, 500.0, 400.0, 1.0, 20.0, 5.0);
 
     private NeumoventStrategy strategy;
 
@@ -58,9 +58,9 @@ class NeumoventStrategyTest {
     // ── RSBI ──────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("evaluate() — RSBI uses tidal volume in litres directly (no mL conversion)")
-    void evaluate_neumoventReading_rsbiUsesTidalVolumeInLitersDirectly() {
-        // Neumovent: 20 / 0.5 L = 40.0  (no division by 1000 — already in L)
+    @DisplayName("evaluate() — RSBI converts tidal volume from mL to L before calculation")
+    void evaluate_neumoventReading_rsbiAppliesMlToLiterConversion() {
+        // 20 / (500 mL / 1000) = 20 / 0.5 = 40.0
         VentilatorEvaluationResult result = strategy.evaluate(NEUMOVENT_READING);
 
         assertThat(result.rsbi().value()).isCloseTo(40.0, within(1e-9));
@@ -80,10 +80,10 @@ class NeumoventStrategyTest {
     // ── Cstat ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("evaluate() — Cstat converts tidal volume from litres to mL before calculation")
-    void evaluate_neumoventReading_cstatConvertsTidalVolumeFromLitresToMl() {
-        // Neumovent: (0.5 L × 1000) / (20 - 5) = 500 / 15 = 33.333...
-        double expected = (0.5 * 1000.0) / (20.0 - 5.0);
+    @DisplayName("evaluate() — Cstat passes tidal volume in mL directly (no unit conversion)")
+    void evaluate_neumoventReading_cstatUsesTidalVolumeInMl() {
+        // 500 / (20 - 5) = 33.333...
+        double expected = 500.0 / (20.0 - 5.0);
         VentilatorEvaluationResult result = strategy.evaluate(NEUMOVENT_READING);
 
         assertThat(result.cstat().value()).isCloseTo(expected, within(1e-9));
@@ -107,7 +107,7 @@ class NeumoventStrategyTest {
     @DisplayName("evaluate() — pplat equal to peepTotal propagates IllegalArgumentException from math engine")
     void evaluate_pplatEqualsPeep_propagatesIllegalArgumentException() {
         VentilatorReading invalidReading =
-                new VentilatorReading(20.0, 0.5, 400.0, 1.0, 10.0, 10.0);
+                new VentilatorReading(20.0, 500.0, 400.0, 1.0, 10.0, 10.0);
 
         assertThatThrownBy(() -> strategy.evaluate(invalidReading))
                 .isInstanceOf(IllegalArgumentException.class);

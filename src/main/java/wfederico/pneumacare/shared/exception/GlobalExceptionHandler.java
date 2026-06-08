@@ -6,6 +6,7 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -97,6 +98,30 @@ public class GlobalExceptionHandler {
                 .status(400)
                 .message("API Error")
                 .data(errors)
+                .traceId(traceId)
+                .build();
+        return ResponseEntity.status(400).body(response);
+    }
+
+    /**
+     * Handles malformed request bodies (invalid JSON syntax, unknown enum values,
+     * type-mismatched fields).
+     *
+     * <p>The exception's raw message often quotes the offending value, which may be
+     * PII or otherwise sensitive — never forward it to the client. The response
+     * carries a generic Spanish message; the underlying cause is logged at WARN
+     * for diagnostics.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponseBase<Void>> handleMessageNotReadable(
+            HttpMessageNotReadableException ex) {
+
+        log.warn("Malformed request body: {}", ex.getMostSpecificCause().getClass().getSimpleName());
+
+        String traceId = MDC.get("traceId");
+        ApiResponseBase<Void> response = ApiResponseBase.<Void>builder()
+                .status(400)
+                .message("Cuerpo de la solicitud inválido")
                 .traceId(traceId)
                 .build();
         return ResponseEntity.status(400).body(response);

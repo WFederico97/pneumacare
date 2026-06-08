@@ -77,8 +77,8 @@ class IcuBedsControllerTest {
     @WithMockUser
     void getIcuBeds_authenticatedUser_returns200WithList() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of(
-                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE),
-                new IcuBedResponse(BED_ID_2, "BED-002", BedStatus.OCCUPIED)
+                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE, null),
+                new IcuBedResponse(BED_ID_2, "BED-002", BedStatus.OCCUPIED, null)
         ));
 
         mockMvc.perform(get(URL).accept(APPLICATION_JSON))
@@ -110,7 +110,7 @@ class IcuBedsControllerTest {
     @DisplayName("getIcuBeds_noAuthenticationInDev_returns200")
     void getIcuBeds_noAuthenticationInDev_returns200() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of(
-                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE)
+                new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE, null)
         ));
 
         mockMvc.perform(get(URL).accept(APPLICATION_JSON))
@@ -125,7 +125,7 @@ class IcuBedsControllerTest {
     @WithMockUser
     void createIcuBed_validRequest_returns201() throws Exception {
         when(service.create(any(CreateIcuBedRequest.class))).thenReturn(
-                new IcuBedResponse(BED_ID_1, "BED-004", BedStatus.AVAILABLE));
+                new IcuBedResponse(BED_ID_1, "BED-004", BedStatus.AVAILABLE, null));
 
         String body = """
                 {
