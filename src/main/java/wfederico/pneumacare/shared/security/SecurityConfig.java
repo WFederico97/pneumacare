@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -22,6 +23,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @EnableConfigurationProperties({RateLimitProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
@@ -55,6 +57,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                // Ensure @PreAuthorize failures for anonymous users return 401 (not 403)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((req, res, e) -> res.sendError(401)))
                 .addFilterBefore(securityFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -73,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/identifier-types").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAuthority("SCOPE_read")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAuthority("SCOPE_write")
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAuthority("SCOPE_write")

@@ -3,6 +3,11 @@ package wfederico.pneumacare.clinical.application;
 import io.micrometer.observation.annotation.Observed;
 import io.opentelemetry.api.trace.Span;
 import org.springframework.stereotype.Service;
+import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.PafiClassification;
+import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
+import wfederico.pneumacare.clinical.web.dto.CstatRequest;
+import wfederico.pneumacare.clinical.web.dto.CstatResponse;
 import wfederico.pneumacare.clinical.web.dto.PafiRequest;
 import wfederico.pneumacare.clinical.web.dto.PafiResponse;
 import wfederico.pneumacare.clinical.web.dto.RsbiRequest;
@@ -52,13 +57,12 @@ public class ClinicalEvaluationService {
             lowCardinalityKeyValues = {"endpoint", "rsbi"}
     )
     public RsbiResponse calculateRsbi(RsbiRequest req) {
-        double rsbi = req.respiratoryRate() / req.tidalVolume();
-        String interpretation = interpretRsbi(rsbi);
-
+        double rsbi = ClinicalMathEngine.calculateRsbi(req.respiratoryRate(),req.tidalVolume());
+        RsbiInterpretation interpretation = RsbiInterpretation.from(rsbi);
         // ── Safe span attributes — computed values only, no PII ──────────────
         Span current = Span.current();
         current.setAttribute("clinical.rsbi.value",          rsbi);
-        current.setAttribute("clinical.rsbi.interpretation",  interpretation);
+        current.setAttribute("clinical.rsbi.interpretation",  interpretation.name());
         current.setAttribute("clinical.rsbi.respiratory_rate", req.respiratoryRate());
         current.setAttribute("clinical.rsbi.tidal_volume",    req.tidalVolume());
 
@@ -80,32 +84,36 @@ public class ClinicalEvaluationService {
             lowCardinalityKeyValues = {"endpoint", "pafi"}
     )
     public PafiResponse calculatePafi(PafiRequest req) {
-        double pafi = req.pao2() / req.fio2();
-        String classification = classifyPafi(pafi);
+        double pafi = ClinicalMathEngine.calculatePafi(req.pao2(),req.fio2());
+        PafiClassification classification = PafiClassification.from(pafi);
 
         // ── Safe span attributes — computed values only, no PII ──────────────
         Span current = Span.current();
         current.setAttribute("clinical.pafi.value",          pafi);
-        current.setAttribute("clinical.pafi.classification",  classification);
+        current.setAttribute("clinical.pafi.classification",  classification.name());
         current.setAttribute("clinical.pafi.pao2",           req.pao2());
         current.setAttribute("clinical.pafi.fio2",           req.fio2());
 
         return new PafiResponse(pafi, classification);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    @Observed(
+            name            = "clinical.cstat.calculation",
+            contextualName  = "calculate-cstat",
+            lowCardinalityKeyValues = {"endpoint", "cstat"}
+    )
+    public CstatResponse calculateCstat(CstatRequest req) {
+        double cstat = ClinicalMathEngine.calculateCstat(req.tidalVolume(),req.plateauPressure(), req.peepTotal());
+        CstatInterpretation interpretation = CstatInterpretation.from(cstat);
 
-    private static String interpretRsbi(double rsbi) {
-        if (rsbi < 80)  return "FAVORABLE";
-        if (rsbi <= 105) return "BORDERLINE";
-        return "UNFAVORABLE";
-    }
+        // ── Safe span attributes — computed values only, no PII ──────────────
+        Span current = Span.current();
+        current.setAttribute("clinical.cstat.value",          cstat);
+        current.setAttribute("clinical.cstat.interpretation", interpretation.name());
+        current.setAttribute("clinical.cstat.tidal_volume",    req.tidalVolume());
+        current.setAttribute("clinical.cstat.plateau_pressure", req.plateauPressure());
+        current.setAttribute("clinical.cstat.peep_total",      req.peepTotal());
 
-    private static String classifyPafi(double pafi) {
-        if (pafi >= 400) return "NORMAL";
-        if (pafi >= 300) return "AT_RISK";
-        if (pafi >= 200) return "MILD_ARDS";
-        if (pafi >= 100) return "MODERATE_ARDS";
-        return "SEVERE_ARDS";
+        return new CstatResponse(cstat, interpretation);
     }
 }

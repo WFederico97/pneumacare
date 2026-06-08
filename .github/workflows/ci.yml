@@ -28,6 +28,9 @@ jobs:
     services:
       postgres:
         image: postgres:17
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           # GitHub Actions does not expose the job-level `env` context inside
           # service-container configuration blocks, so the fallback expressions
@@ -45,6 +48,9 @@ jobs:
 
       redis:
         image: redis:7.4
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 6379:6379
         options: >-
@@ -73,7 +79,7 @@ jobs:
 
       - name: Publish test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: test-results-${{ github.run_id }}
           path: target/surefire-reports/*.xml

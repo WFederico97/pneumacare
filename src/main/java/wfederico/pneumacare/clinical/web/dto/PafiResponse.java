@@ -1,5 +1,7 @@
 package wfederico.pneumacare.clinical.web.dto;
 
+import wfederico.pneumacare.clinical.domain.PafiClassification;
+
 /**
  * Result of a PaO₂/FiO₂ ratio (PaFi) calculation.
  *
@@ -18,5 +20,5 @@ public record PafiResponse(
         double pafi,
 
         /** ARDS severity classification based on PaFi value. */
-        String classification
+        PafiClassification classification
 ) {}
