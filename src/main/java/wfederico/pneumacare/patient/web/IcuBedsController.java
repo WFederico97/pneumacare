@@ -56,17 +56,21 @@ public class IcuBedsController {
                                     value = """
                                             {
                                               "status": 200,
-                                              "message": "ICU Beds retrieved successfully",
+                                              "message": "Camas de UCI recuperadas exitosamente",
                                               "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
                                               "data": [
                                                 {
+                                                    "bedId": "dddddddd-0000-0000-0000-000000000001",
                                                     "bedNumber": "BED-001",
                                                     "status": "AVAILABLE",
+                                                    "patientId": null
                                                 },
                                                 {
+                                                    "bedId": "dddddddd-0000-0000-0000-000000000002",
                                                     "bedNumber": "BED-002",
                                                     "status": "OCCUPIED",
-                                                },
+                                                    "patientId": "aaaaaaaa-0000-0000-0000-000000000001"
+                                                }
                                               ]
                                             }
                                             """))),

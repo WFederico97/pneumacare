@@ -2,6 +2,8 @@ package wfederico.pneumacare.clinical.infrastructure.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,6 +16,9 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.PafiClassification;
+import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -116,6 +121,33 @@ public class EvaluationJpaEntity {
     /** Computed Cstat snapshot — {@code Vt / (Pplat − PEEP)} in mL/cmH₂O. Stored for audit. */
     @Column(name = "cstat_snapshot")
     private BigDecimal cstatSnapshot;
+
+    /**
+     * RSBI weaning-outcome interpretation captured at evaluation time.
+     *
+     * <p>Persisted (rather than re-derived from {@link #rsbiSnapshot}) so the
+     * clinical judgement recorded for this evaluation remains stable even if the
+     * classification thresholds in {@link RsbiInterpretation} are later revised.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rsbi_interpretation", length = 20)
+    private RsbiInterpretation rsbiInterpretation;
+
+    /**
+     * PaFi Berlin-Definition ARDS classification captured at evaluation time.
+     * Persisted for the same threshold-drift reason as {@link #rsbiInterpretation}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pafi_classification", length = 20)
+    private PafiClassification pafiClassification;
+
+    /**
+     * Static-compliance interpretation captured at evaluation time.
+     * Persisted for the same threshold-drift reason as {@link #rsbiInterpretation}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cstat_interpretation", length = 20)
+    private CstatInterpretation cstatInterpretation;
 
     /** {@code true} if any clinical threshold was breached during this evaluation. */
     @Column(name = "alert_triggered", nullable = false)

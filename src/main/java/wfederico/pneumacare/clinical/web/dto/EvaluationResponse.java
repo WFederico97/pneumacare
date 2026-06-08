@@ -13,13 +13,14 @@ import java.util.UUID;
 /**
  * Response payload for {@code POST /api/v1/evaluations} (201 Created).
  *
- * <p>Mirrors every persisted column plus the three interpretation enums that are
- * computed server-side but not stored in the database (they are deterministic
- * functions of the snapshot values and can always be re-derived).
+ * <p>Mirrors every persisted column, including the three interpretation enums.
+ * These are computed server-side at evaluation time and stored alongside the
+ * numeric snapshots so the recorded clinical judgement stays stable even if the
+ * classification thresholds are later revised.
  *
- * <p>The {@link #from} factory method takes the saved entity together with the
- * interpretation results so the service layer does not need to re-compute them
- * after the save.
+ * <p>The {@link #from} factory method reads every field — interpretations
+ * included — directly from the saved entity, so the persisted value is the
+ * single source of truth.
  */
 @Schema(description = "Persisted evaluation record with computed clinical indices.")
 public record EvaluationResponse(
@@ -85,20 +86,13 @@ public record EvaluationResponse(
         UUID createdBy) {
 
     /**
-     * Maps a saved {@link EvaluationJpaEntity} together with its interpretation
-     * results to this response DTO.
+     * Maps a saved {@link EvaluationJpaEntity} to this response DTO, reading every
+     * field — including the persisted interpretation enums — from the entity.
      *
-     * @param entity            the saved (and auto-ID-populated) evaluation entity
-     * @param rsbiInterpretation weaning outcome classification derived from the RSBI snapshot
-     * @param pafiClassification Berlin Definition ARDS classification derived from the PaFi snapshot
-     * @param cstatInterpretation lung compliance interpretation derived from the Cstat snapshot
+     * @param entity the saved (and auto-ID-populated) evaluation entity
      * @return fully-populated response record
      */
-    public static EvaluationResponse from(
-            EvaluationJpaEntity entity,
-            RsbiInterpretation rsbiInterpretation,
-            PafiClassification pafiClassification,
-            CstatInterpretation cstatInterpretation) {
+    public static EvaluationResponse from(EvaluationJpaEntity entity) {
 
         return new EvaluationResponse(
                 entity.getId(),
@@ -113,11 +107,11 @@ public record EvaluationResponse(
                 entity.getPplat(),
                 entity.getPeep(),
                 entity.getRsbiSnapshot(),
-                rsbiInterpretation,
+                entity.getRsbiInterpretation(),
                 entity.getPafiSnapshot(),
-                pafiClassification,
+                entity.getPafiClassification(),
                 entity.getCstatSnapshot(),
-                cstatInterpretation,
+                entity.getCstatInterpretation(),
                 entity.isAlertTriggered(),
                 entity.getCreatedBy());
     }
