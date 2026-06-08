@@ -138,6 +138,9 @@ class EvaluationPersistenceServiceTest {
                     .rsbiSnapshot(arg.getRsbiSnapshot())
                     .pafiSnapshot(arg.getPafiSnapshot())
                     .cstatSnapshot(arg.getCstatSnapshot())
+                    .rsbiInterpretation(arg.getRsbiInterpretation())
+                    .pafiClassification(arg.getPafiClassification())
+                    .cstatInterpretation(arg.getCstatInterpretation())
                     .createdBy(arg.getCreatedBy())
                     .build();
         });
@@ -189,6 +192,21 @@ class EvaluationPersistenceServiceTest {
         assertThat(response.rsbiInterpretation()).isEqualTo(RsbiInterpretation.FAVORABLE);
         assertThat(response.pafiClassification()).isEqualTo(PafiClassification.MILD_ARDS);
         assertThat(response.cstatInterpretation()).isEqualTo(CstatInterpretation.LOW);
+    }
+
+    @Test
+    @DisplayName("create_validRequest_interpretationsFromStrategyResultPersistedOnEntity")
+    void create_validRequest_interpretationsPersistedOnEntity() {
+        service.create(validRequest);
+
+        ArgumentCaptor<EvaluationJpaEntity> captor =
+                ArgumentCaptor.forClass(EvaluationJpaEntity.class);
+        verify(evaluationRepository).save(captor.capture());
+
+        EvaluationJpaEntity persisted = captor.getValue();
+        assertThat(persisted.getRsbiInterpretation()).isEqualTo(RsbiInterpretation.FAVORABLE);
+        assertThat(persisted.getPafiClassification()).isEqualTo(PafiClassification.MILD_ARDS);
+        assertThat(persisted.getCstatInterpretation()).isEqualTo(CstatInterpretation.LOW);
     }
 
     // ── Brand routing ────────────────────────────────────────────────────

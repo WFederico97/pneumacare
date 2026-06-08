@@ -114,6 +114,9 @@ public class EvaluationPersistenceService {
                 .rsbiSnapshot(bd(result.rsbi().value()))
                 .pafiSnapshot(bd(result.pafi().value()))
                 .cstatSnapshot(bd(result.cstat().value()))
+                .rsbiInterpretation(result.rsbi().interpretation())
+                .pafiClassification(result.pafi().classification())
+                .cstatInterpretation(result.cstat().interpretation())
                 .createdBy(createdBy)
                 .build();
 
@@ -123,11 +126,7 @@ public class EvaluationPersistenceService {
                 saved.getId(), saved.getPatientId(), request.brand(),
                 saved.getRsbiSnapshot(), saved.getPafiSnapshot(), saved.getCstatSnapshot());
 
-        return EvaluationResponse.from(
-                saved,
-                result.rsbi().interpretation(),
-                result.pafi().classification(),
-                result.cstat().interpretation());
+        return EvaluationResponse.from(saved);
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
