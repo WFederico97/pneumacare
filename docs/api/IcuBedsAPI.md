@@ -38,12 +38,16 @@ by the authenticated user's JWT claim `icu_id`.
   "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
   "data": [
     {
+      "bedId": "dddddddd-0000-0000-0000-000000000001",
       "bedNumber": "BED-001",
-      "status": "AVAILABLE"
+      "status": "AVAILABLE",
+      "patientId": null
     },
     {
+      "bedId": "dddddddd-0000-0000-0000-000000000002",
       "bedNumber": "BED-002",
-      "status": "OCCUPIED"
+      "status": "OCCUPIED",
+      "patientId": "aaaaaaaa-0000-0000-0000-000000000001"
     }
   ]
 }
@@ -62,10 +66,12 @@ by the authenticated user's JWT claim `icu_id`.
 
 ### Response Schema — `IcuBedResponse`
 
-| Field       | Type     | Description                                                        |
-|-------------|----------|--------------------------------------------------------------------|
-| `bedNumber` | `String` | Human-readable bed identifier (e.g. `BED-001`).                   |
-| `status`    | `String` | Bed state for dashboard. Possible values: `AVAILABLE`, `OCCUPIED` |
+| Field       | Type     | Nullable | Description                                                                          |
+|-------------|----------|----------|--------------------------------------------------------------------------------------|
+| `bedId`     | `UUID`   | No       | Bed UUID (`icu_beds.id`).                                                            |
+| `bedNumber` | `String` | No       | Human-readable bed identifier (e.g. `BED-001`).                                      |
+| `status`    | `String` | No       | Bed state for dashboard. Possible values: `AVAILABLE`, `OCCUPIED`.                   |
+| `patientId` | `UUID`   | Yes      | UUID of the admitted patient occupying the bed. `null` when the bed is not `OCCUPIED`. |
 
 ### Error Responses
 

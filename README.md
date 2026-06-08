@@ -12,6 +12,7 @@
 ## Table of Contents
 
 - [Architecture](#architecture)
+- [API](#api)
 - [Project Structure](#project-structure)
 - [Shared Kernel](#shared-kernel)
   - [config](#config)
@@ -65,7 +66,32 @@ Pneumacare is a **hexagonal monolith** (ports and adapters). Each bounded contex
 
 **Dependency rule**: `infra → application → domain`. The `shared/` package is the cross-cutting kernel available to all layers.
 
-> **Status**: The real domain (ICU respiratory physiotherapy) is being designed. The scaffold is fully wired and compiles cleanly. No bounded contexts exist yet.
+> **Status**: Two bounded contexts are implemented — **`patient`** (ICU beds, patient
+> admission with AES-256-GCM-encrypted PII, identifier types) and **`clinical`**
+> (ventilator evaluation persistence and the multi-brand mathematical engine). These
+> deliver the core end-to-end workflow: visualize ICU bed status → admit a patient →
+> submit a strictly-validated respiratory evaluation processed by the ventilator engine.
+> See [API](#api) for the public endpoints.
+
+---
+
+## API
+
+All endpoints are versioned under `/api/v1` and return the `ApiResponseBase<T>` envelope.
+Interactive docs are served by springdoc at `/swagger-ui.html`; per-resource reference
+docs live in [`docs/api/`](docs/api).
+
+| Method | Path | Description | Auth (staging/prod) | Reference |
+|---|---|---|---|---|
+| `GET`  | `/api/v1/icu-beds`        | List dashboard beds for the caller's ICU (tenant-scoped) | `SCOPE_read`     | [IcuBedsAPI.md](docs/api/IcuBedsAPI.md) |
+| `POST` | `/api/v1/icu-beds`        | Create a bed in the caller's ICU                         | `SCOPE_write`    | [IcuBedsAPI.md](docs/api/IcuBedsAPI.md) |
+| `GET`  | `/api/v1/identifier-types`| List patient identifier types (DNI, CUIL, …)            | none             | [PatientsAPI.md](docs/api/PatientsAPI.md) |
+| `POST` | `/api/v1/patients`        | Admit a patient (atomic; PII encrypted at rest)         | `SCOPE_write`    | [PatientsAPI.md](docs/api/PatientsAPI.md) |
+| `GET`  | `/api/v1/patients/{id}`   | Retrieve an admitted patient (PII decrypted)            | `SCOPE_read`     | [PatientsAPI.md](docs/api/PatientsAPI.md) |
+| `POST` | `/api/v1/evaluations`     | Persist a ventilator evaluation (RSBI/PaFi/Cstat computed) | `ROLE_THERAPIST` | [EvaluationsAPI.md](docs/api/EvaluationsAPI.md) |
+| `GET`  | `/api/health`             | Connectivity / service health check                     | none             | — |
+
+In the `dev` profile all `/api/**` endpoints are open (`permitAll`). See [Security](#security-1).
 
 ---
 
@@ -75,6 +101,18 @@ Pneumacare is a **hexagonal monolith** (ports and adapters). Each bounded contex
 src/main/java/wfederico/pneumacare/
 │
 ├── PneumacareApplication.java              Entry point. Excludes DatadogMetricsExportAutoConfiguration.
+│
+├── patient/                                Bounded context: ICU beds, patient admission, identifiers.
+│   ├── application/                        Services: IcuBedService, PatientIdentityService, PatientIdentifierTypeService.
+│   ├── domain/                             Enums: BedStatus, ClinicalStatus.
+│   ├── infrastructure/persistence/         JPA entities + repositories (ICU, beds, patients, identities).
+│   └── web/                                Controllers (IcuBeds, Patient, IdentifierType) + DTOs.
+│
+├── clinical/                               Bounded context: ventilator evaluation + math engine.
+│   ├── application/                        EvaluationPersistenceService, ClinicalMathEngine, strategy/ (Tecme, Neumovent, factory).
+│   ├── domain/                             Interpretation enums (RSBI, PaFi, Cstat), VentilatorBrand, I/O records.
+│   ├── infrastructure/persistence/         EvaluationJpaEntity + EvaluationRepository.
+│   └── web/                                EvaluationController + DTOs.
 │
 └── shared/                                 Cross-cutting kernel — shared by all bounded contexts.
     ├── config/

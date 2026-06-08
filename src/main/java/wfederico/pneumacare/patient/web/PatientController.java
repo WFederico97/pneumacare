@@ -55,17 +55,16 @@ public class PatientController {
                     Admits a patient to the ICU in a single atomic transaction:
 
                     1. Validates the ICU and bed (bed must belong to the ICU and be **AVAILABLE**).
-                    2. Creates a `patient_identities` PII record with the given name, birth date, and \
-                    DNI (plus any additional identifiers). All PII values are stored \
-                    **AES-256-GCM encrypted at rest**.
+                    2. Creates a `patient_identities` PII record with the given name and \
+                    birth date, plus one `patient_identifiers` row for the supplied \
+                    identifier. All PII values are stored **AES-256-GCM encrypted at rest**.
                     3. Creates the operational `patients` record linking identity, ICU, and bed.
                     4. Marks the bed **OCCUPIED**.
 
                     On any failure the whole transaction is rolled back.
 
                     Obtain valid `icuId` values from `GET /api/v1/icus` and valid \
-                    `identifierTypeId` values (for additional identifiers) from \
-                    `GET /api/v1/identifier-types`.
+                    `identifierTypeId` values from `GET /api/v1/identifier-types`.
 
                     **Required scope (staging/prod):** `SCOPE_write` — open in dev.
                     """,
@@ -76,32 +75,29 @@ public class PatientController {
                             schema = @Schema(implementation = CreatePatientRequest.class),
                             examples = {
                                     @ExampleObject(
-                                            name = "DNI only",
-                                            summary = "Minimal admission with DNI only",
+                                            name = "DNI",
+                                            summary = "Admission with a DNI identifier",
                                             value = """
                                                     {
                                                       "firstName": "Juan",
                                                       "lastName": "Pérez",
                                                       "birthDate": "1989-05-14",
-                                                      "dni": "35123456",
+                                                      "identifier": { "identifierTypeId": 1, "value": "35123456" },
                                                       "icuId": "cccccccc-0000-0000-0000-000000000001",
                                                       "bedId": "dddddddd-0000-0000-0000-000000000001"
                                                     }
                                                     """),
                                     @ExampleObject(
-                                            name = "DNI + CUIL",
-                                            summary = "Admission with DNI and additional CUIL identifier",
+                                            name = "CUIL",
+                                            summary = "Admission with a CUIL identifier",
                                             value = """
                                                     {
                                                       "firstName": "María",
                                                       "lastName": "González",
                                                       "birthDate": "1975-11-22",
-                                                      "dni": "12345678",
+                                                      "identifier": { "identifierTypeId": 2, "value": "27-12345678-4" },
                                                       "icuId": "cccccccc-0000-0000-0000-000000000001",
-                                                      "bedId": "dddddddd-0000-0000-0000-000000000002",
-                                                      "additionalIdentifiers": [
-                                                        { "identifierTypeId": 2, "value": "27-12345678-4" }
-                                                      ]
+                                                      "bedId": "dddddddd-0000-0000-0000-000000000002"
                                                     }
                                                     """)
                             })))
@@ -122,20 +118,19 @@ public class PatientController {
                                                 "firstName": "Juan",
                                                 "lastName": "Pérez",
                                                 "birthDate": "1989-05-14",
-                                                "dni": "35123456",
+                                                "identifier": { "typeName": "DNI", "value": "35123456" },
                                                 "icuId": "cccccccc-0000-0000-0000-000000000001",
                                                 "bedId": "dddddddd-0000-0000-0000-000000000001",
                                                 "admissionDate": "2026-06-06T10:00:00-03:00",
-                                                "clinicalStatus": "ADMITTED",
-                                                "additionalIdentifiers": []
+                                                "clinicalStatus": "ADMITTED"
                                               }
                                             }
                                             """))),
             @ApiResponse(
                     responseCode = "400",
                     description = "Validation error — one or more fields failed validation " +
-                            "(blank name, missing/malformed DNI, missing icuId/bedId, " +
-                            "bed not found, bed not AVAILABLE, duplicate identifier type, etc.).",
+                            "(blank name, missing/invalid identifier, missing icuId/bedId, " +
+                            "bed not found, bed not AVAILABLE, unknown identifierTypeId, etc.).",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)),
             @ApiResponse(
                     responseCode = "401",
@@ -168,8 +163,8 @@ public class PatientController {
             description = """
                     Retrieves an admitted patient by their operational UUID ({@code patients.id}).
 
-                    PII fields ({@code firstName}, {@code lastName}, {@code dni}, and any \
-                    additional identifier values) are decrypted transparently from AES-256-GCM \
+                    PII fields ({@code firstName}, {@code lastName}, and the identifier \
+                    {@code value}) are decrypted transparently from AES-256-GCM \
                     storage before the response is sent. Callers always receive plain text.
 
                     **Required scope (staging/prod):** `SCOPE_read` — open in dev.
@@ -191,12 +186,11 @@ public class PatientController {
                                                 "firstName": "Juan",
                                                 "lastName": "Pérez",
                                                 "birthDate": "1989-05-14",
-                                                "dni": "35123456",
+                                                "identifier": { "typeName": "DNI", "value": "35123456" },
                                                 "icuId": "cccccccc-0000-0000-0000-000000000001",
                                                 "bedId": "dddddddd-0000-0000-0000-000000000001",
                                                 "admissionDate": "2026-06-06T10:00:00-03:00",
-                                                "clinicalStatus": "ADMITTED",
-                                                "additionalIdentifiers": []
+                                                "clinicalStatus": "ADMITTED"
                                               }
                                             }
                                             """))),
