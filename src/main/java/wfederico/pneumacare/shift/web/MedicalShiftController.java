@@ -6,15 +6,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.Response;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
@@ -40,6 +36,29 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MedicalShiftController {
     private final MedicalShiftService service;
+
+    @Operation(
+            summary = "Get the active shift for the current ICU",
+            description = "Returns the OPEN shift for the caller's ICU, or null data when none is open.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Active shift returned, or null when none is open."),
+            @ApiResponse(responseCode = "401", description = "Unauthenticated (enforced once auth is implemented)."),
+            @ApiResponse(responseCode = "403", description = "Authenticated without clinical access (deferred to auth USs).")
+    })
+    @GetMapping("/active")
+    public ResponseEntity<ApiResponseBase<ShiftResponse>> getActiveShift(){
+        ShiftResponse data = service.getActiveShift().orElse(null);
+        return ResponseEntity.ok(
+                ApiResponseBase.<ShiftResponse>builder()
+                        .status(HttpStatus.OK.value())
+                        .message(data != null ?
+                                RequestMessageConstants.SHIFT_ACTIVE_RETRIEVED :
+                                RequestMessageConstants.NO_ACTIVE_SHIFT)
+                        .data(data)
+                        .traceId(MDC.get("traceId"))
+                        .build()
+        );
+    }
 
     @Operation(
             summary = "Open a medical shift",

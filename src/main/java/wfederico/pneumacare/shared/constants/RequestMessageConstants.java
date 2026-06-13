@@ -13,4 +13,6 @@ public final class RequestMessageConstants {
     public static final String ICU_BED_CREATED       = "Cama de UCI creada exitosamente";
     public static final String SHIFT_OPENED = "Turno abierto exitosamente";
     public static final String SHIFT_CLOSED = "Turno cerrado exitosamente";
+    public static final String SHIFT_ACTIVE_RETRIEVED = "Turno activo recuperado exitosamente";
+    public static final String NO_ACTIVE_SHIFT = "No hay turno activo";
 }
