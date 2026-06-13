@@ -34,4 +34,16 @@ public final class ExceptionMessageConstants {
     /** A patient record already exists for the given identity. */
     public static final String PATIENT_ALREADY_ADMITTED =
             "El paciente ya se encuentra internado con id: ";
+
+    // ── Medical shifts ─────────────────────────────────────────────
+
+    /** An OPEN shift already exists for the given ICU. */
+    public static final String SHIFT_ALREADY_OPEN_FOR_ICU =
+            "Ya existe un turno abierto para esta UCI";
+
+    /** The requested shift does not exist. */
+    public static final String SHIFT_NOT_FOUND = "No existe el turno con id: ";
+
+    /** The shift is already CLOSED and cannot be closed again. */
+    public static final String SHIFT_ALREADY_CLOSED = "El turno ya está cerrado";
 }
