@@ -128,6 +128,56 @@ Includes a `Location: /api/v1/shifts/{id}` header.
 
 ---
 
+## Endpoint: Get Active Shift
+
+- **URL:** `GET /api/v1/shifts/active`
+- **Required permissions:** `ROLE_THERAPIST` or `ROLE_CHIEF_OF_GUARD` (deferred — open in dev)
+- **Request body:** none
+
+Returns the active (`OPEN`) shift for the caller's ICU. The ICU is taken from the
+request context (the authenticated user's `icu_id` once auth lands; until then the
+configured `app.security.dev-default-icu-id`).
+
+### Behavior
+
+1. Resolves the current ICU from the request context.
+2. Looks up the single `OPEN` shift for that ICU.
+3. Returns it when present; otherwise returns `200` with `data: null`.
+
+### Response — 200 OK (active shift)
+
+```json
+{
+  "status": 200,
+  "message": "Turno activo recuperado exitosamente",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "data": {
+    "id": "bbbbbbbb-0000-0000-0000-000000000001",
+    "icuId": "cccccccc-0000-0000-0000-000000000001",
+    "startedBy": "eeeeeeee-0000-0000-0000-000000000001",
+    "status": "OPEN",
+    "startedAt": "2026-06-13T08:00:00Z",
+    "endTime": null
+  }
+}
+```
+
+### Response — 200 OK (no active shift)
+
+> **Design choice:** "none" is returned as `200` with `data: null` (not `204 No Content`),
+> to keep the `ApiResponseBase` envelope — and its `traceId` — consistent across all endpoints.
+
+```json
+{
+  "status": 200,
+  "message": "No hay turno activo",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "data": null
+}
+```
+
+---
+
 ## Response Schema — `ShiftResponse`
 
 | Field       | Type                          | Nullable | Description                                                     |
