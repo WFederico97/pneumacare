@@ -15,7 +15,7 @@ import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.IllegalFormatCodePointException;
+import java.util.Optional;
 import java.util.UUID;
 
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.ICU_NOT_FOUND;
@@ -24,7 +24,7 @@ import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.SH
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.SHIFT_NOT_FOUND;
 
 /**
- * Application service for the medical shift lifecycle (open / close) — PNMC-91.
+ * Application service for the medical shift lifecycle (open / close).
  *
  * <p>Depends only on its own ports ({@link IcuExistencePort}, {@link CurrentUserPort})
  * and its repository — no patient-context or Spring Security types leak in here.
@@ -36,9 +36,18 @@ public class MedicalShiftService {
     private final MedicalShiftRepository shiftRepository;
     private final IcuExistencePort icuExistencePort;
     private final CurrentUserPort currentUserPort;
+    private final CurrentIcuPort currentIcuPort;
 
     /**
-     * Opens a new shift for an ICU. (AC1; AC2 conflict; AC3 unknown ICU.)
+     * Returns the active (OPEN) shift for the current context's ICU, if any.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ShiftResponse> getActiveShift(){
+        UUID icuId = currentIcuPort.currentIcuId();
+        return shiftRepository.findByIcuIdAndStatus(icuId,ShiftStatus.OPEN)
+                .map(ShiftResponse::from);
+    }/**
+     * Opens a new shift for an ICU.
      */
     @Transactional
     public ShiftResponse open(CreateShiftRequest shiftRequest){

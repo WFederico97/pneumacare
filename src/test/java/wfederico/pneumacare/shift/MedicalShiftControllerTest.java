@@ -24,6 +24,7 @@ import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +36,7 @@ import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -168,5 +170,31 @@ class MedicalShiftControllerTest {
         mockMvc.perform(patch(URL + "/" + SHIFT_ID + "/close"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    @DisplayName("getActiveShift_openShiftExists_returns200WithShift")
+    void getActiveShift_openShiftExists_returns200WithShift() throws Exception {
+        when(service.getActiveShift()).thenReturn(Optional.of(openResponse()));
+
+        mockMvc.perform(get(URL + "/active").accept(APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.message").value("Turno activo recuperado exitosamente"))
+                .andExpect(jsonPath("$.data.id").value(SHIFT_ID.toString()))
+                .andExpect(jsonPath("$.data.icuId").value(ICU_ID.toString()))
+                .andExpect(jsonPath("$.data.status").value("OPEN"));
+    }
+
+    @Test
+    @DisplayName("getActiveShift_noOpenShift_returns200WithNullData")
+    void getActiveShift_noOpenShift_returns200WithNullData() throws Exception {
+        when(service.getActiveShift()).thenReturn(Optional.empty());
+
+        mockMvc.perform(get(URL + "/active").accept(APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.message").value("No hay turno activo"))
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 }

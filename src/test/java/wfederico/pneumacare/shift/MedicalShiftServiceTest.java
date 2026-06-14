@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shift.application.CurrentIcuPort;
 import wfederico.pneumacare.shift.application.CurrentUserPort;
 import wfederico.pneumacare.shift.application.IcuExistencePort;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
@@ -43,6 +44,8 @@ class MedicalShiftServiceTest {
     private IcuExistencePort icuExistencePort;
     @Mock
     private CurrentUserPort currentUserPort;
+    @Mock
+    private CurrentIcuPort currentIcuPort;
 
     @InjectMocks
     private MedicalShiftService service;
@@ -165,5 +168,35 @@ class MedicalShiftServiceTest {
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("getActiveShift_openShiftExists_returnsShift")
+    void getActiveShift_openShiftExists_returnsShift() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
+        MedicalShiftJpaEntity open = MedicalShiftJpaEntity.builder()
+                .id(SHIFT_ID)
+                .icuId(ICU_ID)
+                .chiefUserId(CHIEF_ID)
+                .startTime(OffsetDateTime.now(ZoneOffset.UTC))
+                .status(ShiftStatus.OPEN)
+                .build();
+        when(shiftRepository.findByIcuIdAndStatus(ICU_ID, ShiftStatus.OPEN)).thenReturn(Optional.of(open));
+
+        Optional<ShiftResponse> result = service.getActiveShift();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().id()).isEqualTo(SHIFT_ID);
+        assertThat(result.get().icuId()).isEqualTo(ICU_ID);
+        assertThat(result.get().status()).isEqualTo(ShiftStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("getActiveShift_noOpenShift_returnsEmpty")
+    void getActiveShift_noOpenShift_returnsEmpty() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
+        when(shiftRepository.findByIcuIdAndStatus(ICU_ID, ShiftStatus.OPEN)).thenReturn(Optional.empty());
+
+        assertThat(service.getActiveShift()).isEmpty();
     }
 }
