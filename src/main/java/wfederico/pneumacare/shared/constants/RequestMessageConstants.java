@@ -17,4 +17,6 @@ public final class RequestMessageConstants {
     public static final String NO_ACTIVE_SHIFT = "No hay turno activo";
     public static final String AIRWAY_EVENT_REGISTERED = "Evento de vía aérea registrado exitosamente";
     public static final String AIRWAY_EVENTS_RETRIEVED = "Eventos de vía aérea recuperados exitosamente";
+    public static final String SBT_REGISTERED = "SBT registrado exitosamente";
+    public static final String SBT_HISTORY_RETRIEVED = "Historial de SBT recuperado exitosamente";
 }

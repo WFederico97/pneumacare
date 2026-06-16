@@ -10,7 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 import wfederico.pneumacare.shift.application.CurrentIcuPort;
-import wfederico.pneumacare.shift.application.CurrentUserPort;
+import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.application.IcuExistencePort;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
