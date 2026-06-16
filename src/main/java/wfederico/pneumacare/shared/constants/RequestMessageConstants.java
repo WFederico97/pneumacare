@@ -19,4 +19,6 @@ public final class RequestMessageConstants {
     public static final String AIRWAY_EVENTS_RETRIEVED = "Eventos de vía aérea recuperados exitosamente";
     public static final String SBT_REGISTERED = "SBT registrado exitosamente";
     public static final String SBT_HISTORY_RETRIEVED = "Historial de SBT recuperado exitosamente";
+    public static final String HANDOVER_CREATED = "Nota de relevo registrada exitosamente";
+    public static final String HANDOVERS_RETRIEVED = "Notas de relevo recuperadas exitosamente";
 }

@@ -65,4 +65,18 @@ public final class ExceptionMessageConstants {
     /** The SBT duration must be a positive integer. */
     public static final String SBT_DURATION_NOT_POSITIVE =
             "La duración del SBT debe ser un entero positivo (mayor a 0)";
+
+    // ── Shift handovers ────────────────────────────────────────────
+
+    /** The handover note content is required and must not be empty. */
+    public static final String HANDOVER_CONTENT_EMPTY =
+            "El contenido de la nota de relevo es obligatorio";
+
+    /** The handover note content exceeds the maximum length. */
+    public static final String HANDOVER_CONTENT_TOO_LONG =
+            "El contenido de la nota de relevo no puede superar los 4000 caracteres";
+
+    /** Notes cannot be added to a CLOSED shift. */
+    public static final String HANDOVER_ON_CLOSED_SHIFT =
+            "No se pueden agregar notas a un turno cerrado";
 }
