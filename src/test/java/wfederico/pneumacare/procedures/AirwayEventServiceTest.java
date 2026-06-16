@@ -11,13 +11,13 @@ import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 import wfederico.pneumacare.procedures.application.ActiveShiftPort;
 import wfederico.pneumacare.procedures.application.AirwayEventService;
-import wfederico.pneumacare.procedures.application.CurrentUserPort;
 import wfederico.pneumacare.procedures.application.PatientAirwayPort;
 import wfederico.pneumacare.procedures.application.PatientAirwayPort.PatientAirwayView;
 import wfederico.pneumacare.procedures.domain.AirwayEventType;
 import wfederico.pneumacare.procedures.infrastructure.persistence.AirwayEventJpaEntity;
 import wfederico.pneumacare.procedures.infrastructure.persistence.AirwayEventRepository;
 import wfederico.pneumacare.procedures.web.dto.AirwayEventResponse;
+import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.procedures.web.dto.CreateAirwayEventRequest;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 

@@ -13,6 +13,7 @@ import wfederico.pneumacare.procedures.infrastructure.persistence.AirwayEventRep
 import wfederico.pneumacare.procedures.web.dto.AirwayEventResponse;
 import wfederico.pneumacare.procedures.web.dto.CreateAirwayEventRequest;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.CurrentUserPort;
 
 import java.util.List;
 import java.util.UUID;
