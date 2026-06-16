@@ -46,4 +46,17 @@ public final class ExceptionMessageConstants {
 
     /** The shift is already CLOSED and cannot be closed again. */
     public static final String SHIFT_ALREADY_CLOSED = "El turno ya está cerrado";
+
+    // ── Airway events (procedures) ─────────────────────────────────
+
+    /** The referenced patient does not exist. */
+    public static final String PATIENT_NOT_FOUND = "No se encontró el paciente con id: ";
+
+    /** The patient's ICU has no OPEN shift, so no clinical event can be registered. */
+    public static final String NO_OPEN_SHIFT =
+            "No hay un turno abierto para la UCI del paciente";
+
+    /** The requested airway transition is not allowed from the patient's current state. */
+    public static final String ILLEGAL_AIRWAY_TRANSITION =
+            "Transición de vía aérea no permitida";
 }

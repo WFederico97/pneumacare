@@ -15,4 +15,6 @@ public final class RequestMessageConstants {
     public static final String SHIFT_CLOSED = "Turno cerrado exitosamente";
     public static final String SHIFT_ACTIVE_RETRIEVED = "Turno activo recuperado exitosamente";
     public static final String NO_ACTIVE_SHIFT = "No hay turno activo";
+    public static final String AIRWAY_EVENT_REGISTERED = "Evento de vía aérea registrado exitosamente";
+    public static final String AIRWAY_EVENTS_RETRIEVED = "Eventos de vía aérea recuperados exitosamente";
 }
