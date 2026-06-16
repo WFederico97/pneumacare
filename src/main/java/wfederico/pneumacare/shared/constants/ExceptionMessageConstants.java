@@ -59,4 +59,10 @@ public final class ExceptionMessageConstants {
     /** The requested airway transition is not allowed from the patient's current state. */
     public static final String ILLEGAL_AIRWAY_TRANSITION =
             "Transición de vía aérea no permitida";
+
+    // ── Spontaneous Breathing Trials (procedures) ──────────────────
+
+    /** The SBT duration must be a positive integer. */
+    public static final String SBT_DURATION_NOT_POSITIVE =
+            "La duración del SBT debe ser un entero positivo (mayor a 0)";
 }
