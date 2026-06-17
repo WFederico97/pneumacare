@@ -3,6 +3,7 @@ package wfederico.pneumacare.clinical.infrastructure.persistence;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -13,4 +14,7 @@ import java.util.UUID;
  */
 @Repository
 public interface EvaluationRepository extends JpaRepository<EvaluationJpaEntity, UUID> {
+
+    /** A patient's evaluations, newest first (by recorded evaluation time). */
+    List<EvaluationJpaEntity> findByPatientIdOrderByEvaluationTimeDesc(UUID patientId);
 }
