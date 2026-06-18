@@ -1,8 +1,8 @@
 package wfederico.pneumacare.shift.infrastructure.persistence;
 
-import io.lettuce.core.BitFieldArgs;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.envers.Audited;
 import wfederico.pneumacare.shared.data.EntityBase;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 
@@ -22,13 +22,15 @@ import java.util.UUID;
  * other bounded contexts. This matches {@code EvaluationJpaEntity}.
  *
  * <h2>Auditing</h2>
- * Extends {@link EntityBase} for {@code created_at}/{@code updated_at}. A medical shift
- * is a mutable (Tier-A) entity, so row-level timestamps apply. Its lifecycle history
- * ({@code OPEN → CLOSED}) is already captured by {@code start_time}/{@code end_time}/
- * {@code status}, so full Envers history is intentionally <em>not</em> used here.
- * The audit columns are added by Flyway V8.
+ * Extends {@link EntityBase} for {@code created_at}/{@code updated_at} (row-level
+ * timestamps; audit columns added by Flyway V8). In addition, the entity is
+ * {@link Audited} (PNMC-134): Hibernate Envers records a full revision history in
+ * {@code medical_shifts_aud} so retroactive edits to {@code CLOSED} shifts can be
+ * detected and queried. Each revision captures the acting user and a timestamp via
+ * the custom revision entity. The Envers schema is created by Flyway V14.
  */
 @Entity
+@Audited
 @Table(name = "medical_shifts")
 @Getter
 @Setter
