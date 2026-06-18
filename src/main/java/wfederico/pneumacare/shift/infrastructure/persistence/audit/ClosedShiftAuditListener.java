@@ -2,7 +2,6 @@ package wfederico.pneumacare.shift.infrastructure.persistence.audit;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Session;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.event.spi.PostInsertEvent;
 import org.hibernate.event.spi.PostInsertEventListener;
@@ -94,11 +93,8 @@ public class ClosedShiftAuditListener implements PostInsertEventListener, PostUp
         if (shiftId == null) {
             return false;
         }
-        // For post-insert/post-update events the session is a full Hibernate Session;
-        // get() returns the managed instance from the persistence context (no extra
-        // query when the service already loaded the shift).
-        MedicalShiftJpaEntity shift =
-                ((Session) session).get(MedicalShiftJpaEntity.class, shiftId);
+        // Resolve from the current persistence context when available; otherwise load by id.
+        MedicalShiftJpaEntity shift = session.find(MedicalShiftJpaEntity.class, shiftId);
         return shift != null && shift.getStatus() == ShiftStatus.CLOSED;
     }
 
