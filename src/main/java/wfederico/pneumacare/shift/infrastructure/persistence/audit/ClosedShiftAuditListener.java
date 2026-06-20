@@ -2,7 +2,7 @@ package wfederico.pneumacare.shift.infrastructure.persistence.audit;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.engine.spi.SharedSessionContractImplementor;
+import org.hibernate.event.spi.EventSource;
 import org.hibernate.event.spi.PostInsertEvent;
 import org.hibernate.event.spi.PostInsertEventListener;
 import org.hibernate.event.spi.PostUpdateEvent;
@@ -56,7 +56,7 @@ public class ClosedShiftAuditListener implements PostInsertEventListener, PostUp
     @Override
     public void onPostInsert(PostInsertEvent event) {
         if (event.getEntity() instanceof ShiftHandoverJpaEntity handover
-                && owningShiftClosed(event.getSession(), handover.getShiftId())) {
+                && owningShiftClosed((EventSource) event.getSession(), handover.getShiftId())) {
             alert("handover", handover.getId());
         }
     }
@@ -69,7 +69,7 @@ public class ClosedShiftAuditListener implements PostInsertEventListener, PostUp
                 alert("medical_shift", shift.getId());
             }
         } else if (entity instanceof ShiftHandoverJpaEntity handover
-                && owningShiftClosed(event.getSession(), handover.getShiftId())) {
+                && owningShiftClosed((EventSource) event.getSession(), handover.getShiftId())) {
             alert("handover", handover.getId());
         }
     }
@@ -89,7 +89,7 @@ public class ClosedShiftAuditListener implements PostInsertEventListener, PostUp
         return null;
     }
 
-    private boolean owningShiftClosed(SharedSessionContractImplementor session, UUID shiftId) {
+    private boolean owningShiftClosed(EventSource session, UUID shiftId) {
         if (shiftId == null) {
             return false;
         }

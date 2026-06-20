@@ -96,7 +96,10 @@ public class PatientIdentityService {
                 .clinicalStatus(ClinicalStatus.ADMITTED)
                 .build();
 
-        PatientJpaEntity savedPatient = patientRepository.save(patient);
+        // saveAndFlush forces the INSERT now so Hibernate's @CreationTimestamp generator
+        // populates admissionDate on the managed instance before the response is built;
+        // a plain save() defers the INSERT to commit, leaving admissionDate null in the response.
+        PatientJpaEntity savedPatient = patientRepository.saveAndFlush(patient);
 
         log.info("Patient admitted: patientId={}, icuId={}, bedId={}, status={}",
                 savedPatient.getId(), icu.getId(), bed.getId(), ClinicalStatus.ADMITTED);

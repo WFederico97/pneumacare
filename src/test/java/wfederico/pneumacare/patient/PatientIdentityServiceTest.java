@@ -124,7 +124,7 @@ class PatientIdentityServiceTest {
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
-        when(patientRepository.save(any())).thenReturn(savedPatient);
+        when(patientRepository.saveAndFlush(any())).thenReturn(savedPatient);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(savedPatient));
 
         // Act
@@ -142,7 +142,7 @@ class PatientIdentityServiceTest {
         assertThat(response.clinicalStatus()).isEqualTo("ADMITTED");
 
         verify(identityRepository).save(any(PatientIdentityJpaEntity.class));
-        verify(patientRepository).save(any(PatientJpaEntity.class));
+        verify(patientRepository).saveAndFlush(any(PatientJpaEntity.class));
     }
 
     @Test
@@ -157,7 +157,7 @@ class PatientIdentityServiceTest {
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
-        when(patientRepository.save(any())).thenReturn(savedPatient);
+        when(patientRepository.saveAndFlush(any())).thenReturn(savedPatient);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(savedPatient));
 
         // Act
@@ -180,7 +180,7 @@ class PatientIdentityServiceTest {
         when(identityRepository.save(any())).thenReturn(savedIdentity);
 
         PatientJpaEntity savedPatient = buildPatientEntity(PATIENT_ID, icu, availableBed, savedIdentity);
-        when(patientRepository.save(any())).thenReturn(savedPatient);
+        when(patientRepository.saveAndFlush(any())).thenReturn(savedPatient);
         when(patientRepository.findById(PATIENT_ID)).thenReturn(Optional.of(savedPatient));
 
         // Act

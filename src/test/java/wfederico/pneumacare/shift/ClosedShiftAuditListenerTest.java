@@ -93,7 +93,7 @@ class ClosedShiftAuditListenerTest {
                 .id(shiftId).status(ShiftStatus.CLOSED).build();
 
         EventSource session = mock(EventSource.class);
-        when(((Session) session).get(MedicalShiftJpaEntity.class, shiftId)).thenReturn(closedShift);
+        when(((Session) session).find(MedicalShiftJpaEntity.class, shiftId)).thenReturn(closedShift);
 
         PostInsertEvent event = mock(PostInsertEvent.class);
         when(event.getEntity()).thenReturn(handover);
@@ -114,7 +114,7 @@ class ClosedShiftAuditListenerTest {
                 .id(shiftId).status(ShiftStatus.OPEN).build();
 
         EventSource session = mock(EventSource.class);
-        when(((Session) session).get(MedicalShiftJpaEntity.class, shiftId)).thenReturn(openShift);
+        when(((Session) session).find(MedicalShiftJpaEntity.class, shiftId)).thenReturn(openShift);
 
         PostInsertEvent event = mock(PostInsertEvent.class);
         when(event.getEntity()).thenReturn(handover);
