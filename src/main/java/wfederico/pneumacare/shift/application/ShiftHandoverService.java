@@ -1,5 +1,7 @@
 package wfederico.pneumacare.shift.application;
 
+import io.micrometer.observation.annotation.Observed;
+import io.opentelemetry.api.trace.Span;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -49,9 +51,16 @@ public class ShiftHandoverService {
      *   <li>The shift must exist — otherwise {@code 404}.</li>
      *   <li>The shift must be OPEN — otherwise {@code 409}, with nothing written.</li>
      * </ol>
+     *
+     * <p>{@link Observed} records a {@code handover.create} timer/span. Only the shift
+     * UUID (non-PII) is added as a span attribute — the note content is never placed on
+     * a span.
      */
+    @Observed(name = "handover.create", contextualName = "create-handover",
+            lowCardinalityKeyValues = {"endpoint", "handover-create"})
     @Transactional
     public HandoverResponse create(UUID shiftId, CreateHandoverRequest request) {
+        Span.current().setAttribute("shift.id", String.valueOf(shiftId));
         String content = request == null ? null : request.notesContent();
         if (content == null || content.isBlank()) {
             throw new BusinessLayerException(HANDOVER_CONTENT_EMPTY, HttpStatus.UNPROCESSABLE_CONTENT);

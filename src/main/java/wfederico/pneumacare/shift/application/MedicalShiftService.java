@@ -1,5 +1,7 @@
 package wfederico.pneumacare.shift.application;
 
+import io.micrometer.observation.annotation.Observed;
+import io.opentelemetry.api.trace.Span;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,12 +49,20 @@ public class MedicalShiftService {
         UUID icuId = currentIcuPort.currentIcuId();
         return shiftRepository.findByIcuIdAndStatus(icuId,ShiftStatus.OPEN)
                 .map(ShiftResponse::from);
-    }/**
+    }
+
+    /**
      * Opens a new shift for an ICU.
+     *
+     * <p>{@link Observed} records a {@code shift.open} timer/span; only the ICU UUID
+     * (non-PII) is added as a span attribute.
      */
+    @Observed(name = "shift.open", contextualName = "open-shift",
+            lowCardinalityKeyValues = {"endpoint", "shift-open"})
     @Transactional
     public ShiftResponse open(CreateShiftRequest shiftRequest){
         UUID icuId = shiftRequest.icuId();
+        Span.current().setAttribute("shift.icu_id", String.valueOf(icuId));
 
         if (!icuExistencePort.exists(icuId)){
             throw new BusinessLayerException(ICU_NOT_FOUND + icuId, HttpStatus.UNPROCESSABLE_CONTENT);
@@ -69,7 +79,9 @@ public class MedicalShiftService {
                 .status(ShiftStatus.OPEN)
                 .build();
         try {
-            return ShiftResponse.from(shiftRepository.save(shift));
+            MedicalShiftJpaEntity saved = shiftRepository.save(shift);
+            Span.current().setAttribute("shift.id", String.valueOf(saved.getId()));
+            return ShiftResponse.from(saved);
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrent open detected for icuId={}, translated to 409.", icuId);
             throw new BusinessLayerException(SHIFT_ALREADY_OPEN_FOR_ICU,HttpStatus.CONFLICT);
@@ -78,9 +90,15 @@ public class MedicalShiftService {
 
     /**
      * Closes an OPEN shift.
+     *
+     * <p>{@link Observed} records a {@code shift.close} timer/span; only the shift UUID
+     * (non-PII) is added as a span attribute.
      */
+    @Observed(name = "shift.close", contextualName = "close-shift",
+            lowCardinalityKeyValues = {"endpoint", "shift-close"})
     @Transactional
     public ShiftResponse close(UUID icuId){
+        Span.current().setAttribute("shift.id", String.valueOf(icuId));
         MedicalShiftJpaEntity shift = shiftRepository.findById(icuId)
                 .orElseThrow(() -> new BusinessLayerException(
                         SHIFT_NOT_FOUND,HttpStatus.NOT_FOUND

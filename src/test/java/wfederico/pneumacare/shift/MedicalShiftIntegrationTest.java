@@ -71,6 +71,15 @@ class MedicalShiftIntegrationTest {
         when(ops.increment(anyString())).thenReturn(1L);
     }
 
+    @BeforeEach
+    void cleanShifts() {
+        // These tests assume no OPEN shift exists for the seeded ICU. The Testcontainers
+        // Postgres is shared with the other RANDOM_PORT integration tests via the cached
+        // Spring context, so clear shift state up front to stay isolated from run order.
+        jdbcTemplate.update("DELETE FROM shift_handovers");
+        jdbcTemplate.update("DELETE FROM medical_shifts");
+    }
+
     private static String openBody() {
         return "{ \"icuId\": \"%s\" }".formatted(IcuTestDataSeeder.ICU_ID);
     }

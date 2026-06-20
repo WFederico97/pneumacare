@@ -2,6 +2,7 @@ package wfederico.pneumacare.shift.infrastructure.persistence;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.envers.Audited;
 import wfederico.pneumacare.shared.data.EntityBase;
 
 import java.util.UUID;
@@ -27,6 +28,7 @@ import java.util.UUID;
  * persistence timestamp from {@link EntityBase}.
  */
 @Entity
+@Audited
 @Table(name = "shift_handovers")
 @Getter
 @Setter

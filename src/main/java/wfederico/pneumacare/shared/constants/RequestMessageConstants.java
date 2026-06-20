@@ -22,4 +22,6 @@ public final class RequestMessageConstants {
     public static final String HANDOVER_CREATED = "Nota de relevo registrada exitosamente";
     public static final String HANDOVERS_RETRIEVED = "Notas de relevo recuperadas exitosamente";
     public static final String TIMELINE_RETRIEVED = "Línea de tiempo del paciente recuperada exitosamente";
+    public static final String SHIFT_AUDIT_RETRIEVED = "Historial de auditoría del turno recuperado exitosamente";
+    public static final String HANDOVER_AUDIT_RETRIEVED = "Historial de auditoría de la nota de relevo recuperado exitosamente";
 }
