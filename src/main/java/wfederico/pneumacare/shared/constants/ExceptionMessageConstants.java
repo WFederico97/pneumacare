@@ -34,4 +34,49 @@ public final class ExceptionMessageConstants {
     /** A patient record already exists for the given identity. */
     public static final String PATIENT_ALREADY_ADMITTED =
             "El paciente ya se encuentra internado con id: ";
+
+    // ── Medical shifts ─────────────────────────────────────────────
+
+    /** An OPEN shift already exists for the given ICU. */
+    public static final String SHIFT_ALREADY_OPEN_FOR_ICU =
+            "Ya existe un turno abierto para esta UCI";
+
+    /** The requested shift does not exist. */
+    public static final String SHIFT_NOT_FOUND = "No existe el turno con id: ";
+
+    /** The shift is already CLOSED and cannot be closed again. */
+    public static final String SHIFT_ALREADY_CLOSED = "El turno ya está cerrado";
+
+    // ── Airway events (procedures) ─────────────────────────────────
+
+    /** The referenced patient does not exist. */
+    public static final String PATIENT_NOT_FOUND = "No se encontró el paciente con id: ";
+
+    /** The patient's ICU has no OPEN shift, so no clinical event can be registered. */
+    public static final String NO_OPEN_SHIFT =
+            "No hay un turno abierto para la UCI del paciente";
+
+    /** The requested airway transition is not allowed from the patient's current state. */
+    public static final String ILLEGAL_AIRWAY_TRANSITION =
+            "Transición de vía aérea no permitida";
+
+    // ── Spontaneous Breathing Trials (procedures) ──────────────────
+
+    /** The SBT duration must be a positive integer. */
+    public static final String SBT_DURATION_NOT_POSITIVE =
+            "La duración del SBT debe ser un entero positivo (mayor a 0)";
+
+    // ── Shift handovers ────────────────────────────────────────────
+
+    /** The handover note content is required and must not be empty. */
+    public static final String HANDOVER_CONTENT_EMPTY =
+            "El contenido de la nota de relevo es obligatorio";
+
+    /** The handover note content exceeds the maximum length. */
+    public static final String HANDOVER_CONTENT_TOO_LONG =
+            "El contenido de la nota de relevo no puede superar los 4000 caracteres";
+
+    /** Notes cannot be added to a CLOSED shift. */
+    public static final String HANDOVER_ON_CLOSED_SHIFT =
+            "No se pueden agregar notas a un turno cerrado";
 }

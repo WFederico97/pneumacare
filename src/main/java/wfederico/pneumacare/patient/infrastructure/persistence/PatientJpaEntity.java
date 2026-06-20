@@ -20,6 +20,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
+import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -104,6 +105,17 @@ public class PatientJpaEntity {
     @Column(name = "clinical_status", nullable = false, length = 50)
     @Builder.Default
     private ClinicalStatus clinicalStatus = ClinicalStatus.ADMITTED;
+
+    /**
+     * Airway / respiratory state of this patient, driven by airway events
+     * (see the {@code procedures} context). Distinct from {@link #clinicalStatus}.
+     * Stored as {@code VARCHAR(50)}; Flyway V10 adds the column with
+     * {@code DEFAULT 'SPONTANEOUS'}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "respiratory_status", nullable = false, length = 50)
+    @Builder.Default
+    private RespiratoryStatus respiratoryStatus = RespiratoryStatus.SPONTANEOUS;
 
     /**
      * Timestamp at which the patient was admitted. Set once at INSERT by
