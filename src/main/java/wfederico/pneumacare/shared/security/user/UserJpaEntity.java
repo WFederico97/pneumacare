@@ -17,6 +17,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import wfederico.pneumacare.shared.data.EntityBase;
 
 import java.util.EnumSet;
@@ -41,6 +42,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString
 public class UserJpaEntity extends EntityBase {
 
     @Id
@@ -53,6 +55,7 @@ public class UserJpaEntity extends EntityBase {
 
     /** BCrypt hash — never plaintext. */
     @Column(name = "password_hash", nullable = false, length = 255)
+    @ToString.Exclude
     private String passwordHash;
 
     @Column(name = "display_name", length = 150)
