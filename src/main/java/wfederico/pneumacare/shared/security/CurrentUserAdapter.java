@@ -6,11 +6,11 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * Temporary {@link CurrentUserPort} adapter used until authentication is implemented.
+ * Resolves the UUID of the user performing the current request.
  *
- * <p>Returns a configured default user UUID. In dev no FK is enforced on the
- * {@code *_user_id} columns that store it, so this value need not reference a real
- * row. TODO (auth US, next sprint): replace the body with JWT-principal resolution.
+ * <p>Returns the authenticated principal's UUID (the JWT {@code sub}) when present;
+ * in dev — where there is no authentication — falls back to a configured default
+ * so the {@code *_user_id} columns are still populated.
  */
 @Component
 public class CurrentUserAdapter implements CurrentUserPort {
@@ -19,6 +19,10 @@ public class CurrentUserAdapter implements CurrentUserPort {
 
     @Override
     public UUID currentUserId() {
+        UUID actor = AuthenticatedActor.currentActorId();
+        if (!AuthenticatedActor.NIL_UUID.equals(actor)) {
+            return actor;
+        }
         return UUID.fromString(defaultUserId);
     }
 }

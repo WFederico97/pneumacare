@@ -35,13 +35,6 @@ spring:
       port: ${REDIS_PORT:6379}
       # password: ${REDIS_PASSWORD:} # Uncomment if redis has password enabled
 
-  # 3. OAuth2 Resource Server (JWT)
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9000}
-
   # 4. Kafka — disabled by default for local dev without Docker.
   #    Set KAFKA_ENABLED=true (and KAFKA_BOOTSTRAP_SERVERS) when running the full stack.
   kafka:
@@ -134,6 +127,13 @@ app:
   security:
     encryption:
       aes-secret-key: ${AES_SECRET_KEY:}
+    # Self-issued JWT (HS256). secret must be >= 256-bit (32 bytes); supply via
+    # PNMC_JWT_SECRET in staging/prod. Never commit a production secret.
+    jwt:
+      secret: ${PNMC_JWT_SECRET:}
+      expiration: PT8H
+      cookie-name: PNMC_AT
+      xsrf-cookie-name: XSRF-TOKEN
     bootstrap-admin:
       # Disabled by default (dev/test). Staging/prod profiles enable it.
       enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
