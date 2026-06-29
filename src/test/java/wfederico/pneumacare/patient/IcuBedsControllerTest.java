@@ -74,7 +74,7 @@ class IcuBedsControllerTest {
 
     @Test
     @DisplayName("getIcuBeds_authenticatedUser_returns200WithList")
-    @WithMockUser
+    @WithMockUser(roles = "THERAPIST")
     void getIcuBeds_authenticatedUser_returns200WithList() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of(
                 new IcuBedResponse(BED_ID_1, "BED-001", BedStatus.AVAILABLE, null),
@@ -95,7 +95,7 @@ class IcuBedsControllerTest {
 
     @Test
     @DisplayName("getIcuBeds_authenticatedUserWithNoBeds_returns200WithEmptyArray")
-    @WithMockUser
+    @WithMockUser(roles = "THERAPIST")
     void getIcuBeds_authenticatedUserWithNoBeds_returns200WithEmptyArray() throws Exception {
         when(service.findBedsForAuthenticatedIcu()).thenReturn(List.of());
 
@@ -122,7 +122,7 @@ class IcuBedsControllerTest {
 
     @Test
     @DisplayName("createIcuBed_validRequest_returns201")
-    @WithMockUser
+    @WithMockUser(roles = "CHIEF_OF_GUARD")
     void createIcuBed_validRequest_returns201() throws Exception {
         when(service.create(any(CreateIcuBedRequest.class))).thenReturn(
                 new IcuBedResponse(BED_ID_1, "BED-004", BedStatus.AVAILABLE, null));

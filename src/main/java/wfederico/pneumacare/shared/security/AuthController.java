@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,7 +24,6 @@ import wfederico.pneumacare.shared.web.dto.LoginResponse;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Authentication endpoints. Issues the JWT only as an HttpOnly cookie plus a
@@ -45,6 +45,7 @@ public class AuthController {
         this.jwtProperties = jwtProperties;
     }
 
+    @PreAuthorize("permitAll()")
     @PostMapping("/login")
     public ResponseEntity<ApiResponseBase<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         Authentication authentication;
@@ -64,12 +65,9 @@ public class AuthController {
                 .toList();
 
         ResponseCookie jwtCookie = buildCookie(jwtProperties.getCookieName(), token, true, jwtProperties.getExpiration());
-        ResponseCookie xsrfCookie = buildCookie(jwtProperties.getXsrfCookieName(),
-                UUID.randomUUID().toString(), false, jwtProperties.getExpiration());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .header(HttpHeaders.SET_COOKIE, xsrfCookie.toString())
                 .body(ApiResponseBase.<LoginResponse>builder()
                         .status(HttpStatus.OK.value())
                         .message("Autenticación exitosa")
@@ -78,6 +76,7 @@ public class AuthController {
                         .build());
     }
 
+    @PreAuthorize("permitAll()")
     @PostMapping("/logout")
     public ResponseEntity<ApiResponseBase<Void>> logout() {
         ResponseCookie jwtCookie = buildCookie(jwtProperties.getCookieName(), "", true, Duration.ZERO);

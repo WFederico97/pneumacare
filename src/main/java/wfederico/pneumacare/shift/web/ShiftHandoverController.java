@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,7 @@ public class ShiftHandoverController {
             @ApiResponse(responseCode = "409", description = "The shift is CLOSED."),
             @ApiResponse(responseCode = "422", description = "notesContent is empty or exceeds 4000 chars.")
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<HandoverResponse>> createHandover(
             @PathVariable UUID shiftId,
@@ -76,6 +78,7 @@ public class ShiftHandoverController {
             @ApiResponse(responseCode = "200", description = "Notes returned (possibly empty)."),
             @ApiResponse(responseCode = "404", description = "No shift exists with the given id.")
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @GetMapping
     public ResponseEntity<ApiResponseBase<List<HandoverResponse>>> getHandovers(
             @PathVariable UUID shiftId) {

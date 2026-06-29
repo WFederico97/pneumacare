@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,6 +55,7 @@ public class TimelineController {
             @ApiResponse(responseCode = "200", description = "Timeline returned (possibly empty)."),
             @ApiResponse(responseCode = "404", description = "The referenced patient does not exist.")
     })
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
     @GetMapping("/{id}/timeline")
     public ResponseEntity<ApiResponseBase<List<TimelineEntryResponse>>> getTimeline(
             @Parameter(description = "Operational patient UUID (patients.id).",

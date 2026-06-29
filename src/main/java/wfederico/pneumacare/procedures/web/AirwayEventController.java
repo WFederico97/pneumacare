@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,6 +55,7 @@ public class AirwayEventController {
             @ApiResponse(responseCode = "404", description = "The referenced patient does not exist."),
             @ApiResponse(responseCode = "409", description = "No OPEN shift, or illegal airway transition.")
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping("/procedures/airway")
     public ResponseEntity<ApiResponseBase<AirwayEventResponse>> registerAirwayEvent(
             @Valid @RequestBody CreateAirwayEventRequest request) {
@@ -77,6 +79,7 @@ public class AirwayEventController {
             @ApiResponse(responseCode = "200", description = "Events returned (possibly empty)."),
             @ApiResponse(responseCode = "404", description = "The referenced patient does not exist.")
     })
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
     @GetMapping("/patients/{patientId}/airway-events")
     public ResponseEntity<ApiResponseBase<List<AirwayEventResponse>>> getPatientAirwayEvents(
             @PathVariable UUID patientId) {
