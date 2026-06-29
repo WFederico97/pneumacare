@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +16,7 @@ import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 public class HealthController {
 
     @Operation(summary = "Health check", description = "Returns the current health status of the service. Useful for frontend-backend connectivity verification.")
+    @PreAuthorize("permitAll()")
     @GetMapping
     public ResponseEntity<ApiResponseBase<HealthStatusResponse>> health() {
         ApiResponseBase<HealthStatusResponse> response = ApiResponseBase.<HealthStatusResponse>builder()

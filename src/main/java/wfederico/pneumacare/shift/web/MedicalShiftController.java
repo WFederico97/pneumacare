@@ -10,6 +10,7 @@ import org.apache.coyote.Response;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
@@ -45,6 +46,7 @@ public class MedicalShiftController {
             @ApiResponse(responseCode = "401", description = "Unauthenticated (enforced once auth is implemented)."),
             @ApiResponse(responseCode = "403", description = "Authenticated without clinical access (deferred to auth USs).")
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @GetMapping("/active")
     public ResponseEntity<ApiResponseBase<ShiftResponse>> getActiveShift(){
         ShiftResponse data = service.getActiveShift().orElse(null);
@@ -69,6 +71,7 @@ public class MedicalShiftController {
             @ApiResponse(responseCode = "409", description = "The ICU already has an OPEN shift."),
             @ApiResponse(responseCode = "422", description = "The referenced ICU does not exist.")
     })
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<ShiftResponse>> openShift(@Valid @RequestBody CreateShiftRequest request){
         ShiftResponse data = service.open(request);
@@ -92,6 +95,7 @@ public class MedicalShiftController {
             @ApiResponse(responseCode = "404", description = "No shift exists with the given id."),
             @ApiResponse(responseCode = "409", description = "The shift is already CLOSED.")
     })
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     @PatchMapping("/{id}/close")
     public ResponseEntity<ApiResponseBase<ShiftResponse>> closeShift(@PathVariable UUID id) {
         ShiftResponse data = service.close(id);

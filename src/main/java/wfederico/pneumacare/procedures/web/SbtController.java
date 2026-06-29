@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,6 +55,7 @@ public class SbtController {
             @ApiResponse(responseCode = "409", description = "No OPEN shift for the patient's ICU."),
             @ApiResponse(responseCode = "422", description = "durationMinutes is not a positive integer.")
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<SbtResponse>> recordSbt(
             @Valid @RequestBody CreateSbtRequest request) {
@@ -77,6 +79,7 @@ public class SbtController {
             @ApiResponse(responseCode = "200", description = "History returned (possibly empty)."),
             @ApiResponse(responseCode = "404", description = "The referenced patient does not exist.")
     })
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
     @GetMapping
     public ResponseEntity<ApiResponseBase<List<SbtResponse>>> getHistory(
             @RequestParam("patientId") UUID patientId) {
