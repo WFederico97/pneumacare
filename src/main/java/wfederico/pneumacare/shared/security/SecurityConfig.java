@@ -28,8 +28,13 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -48,6 +53,10 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
     private final RateLimitProperties rateLimitProperties;
     private final CorsProperties corsProperties;
+
+    @org.springframework.beans.factory.annotation.Value(
+            "${app.security.dev-default-chief-user-id:eeeeeeee-0000-0000-0000-000000000001}")
+    private String devDefaultUserId;
 
     public SecurityConfig(StringRedisTemplate redisTemplate,
                           ObjectMapper objectMapper,
@@ -74,24 +83,30 @@ public class SecurityConfig {
                         .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                // Ensure @PreAuthorize failures for anonymous users return 401 (not 403)
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, res, e) -> res.sendError(401)))
+                        .authenticationEntryPoint(problemAuthenticationEntryPoint())
+                        .accessDeniedHandler(problemAccessDeniedHandler()))
+                .addFilterBefore(new DevAuthInjectionFilter(devDefaultUserId), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(securityFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ── Staging / Prod: self-issued cookie JWT + scope-based authorization ─
+    // ── Staging / Prod: self-issued cookie JWT + CSRF + role method security ─
     @Bean
     @Profile("!dev")
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtDecoder jwtDecoder,
                                                    JwtAuthenticationConverter jwtAuthenticationConverter,
-                                                   BearerTokenResolver cookieBearerTokenResolver) throws Exception {
+                                                   BearerTokenResolver cookieBearerTokenResolver,
+                                                   AccessDeniedHandler problemAccessDeniedHandler,
+                                                   AuthenticationEntryPoint problemAuthenticationEntryPoint) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        .ignoringRequestMatchers("/api/v1/auth/login", "/api/v1/auth/logout"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -100,19 +115,20 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/identifier-types").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAuthority("SCOPE_read")
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasAuthority("SCOPE_write")
-                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAuthority("SCOPE_write")
-                        .requestMatchers(HttpMethod.PATCH, "/api/**").hasAuthority("SCOPE_write")
-                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAuthority("SCOPE_write")
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(problemAuthenticationEntryPoint)
+                        .accessDeniedHandler(problemAccessDeniedHandler))
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(problemAuthenticationEntryPoint)
+                        .accessDeniedHandler(problemAccessDeniedHandler)
                         .bearerTokenResolver(cookieBearerTokenResolver)
                         .jwt(jwt -> jwt
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter)))
-                .addFilterBefore(securityFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(securityFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
 
         return http.build();
     }
@@ -148,6 +164,16 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public AccessDeniedHandler problemAccessDeniedHandler() {
+        return new ProblemDetailAccessDeniedHandler(objectMapper);
+    }
+
+    @Bean
+    public AuthenticationEntryPoint problemAuthenticationEntryPoint() {
+        return new ProblemDetailAuthenticationEntryPoint(objectMapper);
     }
 
     @Bean
