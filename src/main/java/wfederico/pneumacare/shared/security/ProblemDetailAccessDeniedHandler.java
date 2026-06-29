@@ -25,8 +25,12 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException ex) throws IOException {
-        String safeUri = request.getRequestURI().replaceAll("[\r\n]", "_");
-        log.warn("Access denied: uri={}, reason={}", safeUri, ex.getClass().getSimpleName());
+        String uri = request.getRequestURI();
+        if (uri != null && uri.matches("[A-Za-z0-9/_.\\-]*")) {
+            log.warn("Access denied: uri={}, reason={}", uri, ex.getClass().getSimpleName());
+        } else {
+            log.warn("Access denied: uri=[unsafe], reason={}", ex.getClass().getSimpleName());
+        }
         ProblemSupport.write(response, HttpStatus.FORBIDDEN, "Acceso denegado",
                 request.getRequestURI(), objectMapper);
     }
