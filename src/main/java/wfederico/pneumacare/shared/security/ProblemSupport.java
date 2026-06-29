@@ -36,14 +36,6 @@ public final class ProblemSupport {
         return problem;
     }
 
-    /**
-     * Neutralizes CR/LF so user-controlled values (e.g. the request URI) cannot
-     * forge or split log records (log injection).
-     */
-    public static String sanitizeForLog(String value) {
-        return value == null ? null : value.replaceAll("[\r\n]", "_");
-    }
-
     public static void write(HttpServletResponse response, HttpStatus status, String detail,
                              String instance, ObjectMapper objectMapper) throws IOException {
         response.setStatus(status.value());

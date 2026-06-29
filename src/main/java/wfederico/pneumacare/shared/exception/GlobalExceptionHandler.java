@@ -60,8 +60,9 @@ public class GlobalExceptionHandler {
         HttpStatus status = isAnonymous ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN;
         String detail = isAnonymous ? "No autenticado" : "Acceso denegado";
 
+        String safeUri = request.getRequestURI().replaceAll("[\r\n]", "_");
         log.warn("Access denied: anonymous={}, uri={}, reason={}",
-                isAnonymous, ProblemSupport.sanitizeForLog(request.getRequestURI()), ex.getClass().getSimpleName());
+                isAnonymous, safeUri, ex.getClass().getSimpleName());
 
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
