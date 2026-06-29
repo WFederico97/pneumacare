@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
         String detail = isAnonymous ? "No autenticado" : "Acceso denegado";
 
         log.warn("Access denied: anonymous={}, uri={}, reason={}",
-                isAnonymous, request.getRequestURI(), ex.getClass().getSimpleName());
+                isAnonymous, ProblemSupport.sanitizeForLog(request.getRequestURI()), ex.getClass().getSimpleName());
 
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)

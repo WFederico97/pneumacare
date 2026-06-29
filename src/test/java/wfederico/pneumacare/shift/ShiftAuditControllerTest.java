@@ -103,6 +103,17 @@ class ShiftAuditControllerTest {
     }
 
     @Test
+    @DisplayName("getShiftAudit with ADMIN returns 200 via role hierarchy (ADMIN > COMPLIANCE)")
+    @WithMockUser(roles = "ADMIN")
+    void shiftAudit_withAdminRole_returns200ViaHierarchy() throws Exception {
+        when(service.getShiftHistory(SHIFT_ID)).thenReturn(List.of(sampleRevision()));
+
+        mockMvc.perform(get(SHIFT_AUDIT_URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200));
+    }
+
+    @Test
     @DisplayName("getShiftAudit without the compliance role returns 403 (problem+json)")
     @WithMockUser(roles = "THERAPIST")
     void shiftAudit_withoutComplianceRole_returns403() throws Exception {

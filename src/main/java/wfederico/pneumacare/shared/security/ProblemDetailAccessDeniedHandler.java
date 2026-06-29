@@ -25,7 +25,8 @@ public class ProblemDetailAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException ex) throws IOException {
-        log.warn("Access denied: uri={}, reason={}", request.getRequestURI(), ex.getClass().getSimpleName());
+        log.warn("Access denied: uri={}, reason={}",
+                ProblemSupport.sanitizeForLog(request.getRequestURI()), ex.getClass().getSimpleName());
         ProblemSupport.write(response, HttpStatus.FORBIDDEN, "Acceso denegado",
                 request.getRequestURI(), objectMapper);
     }
