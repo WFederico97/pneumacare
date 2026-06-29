@@ -24,7 +24,6 @@ import wfederico.pneumacare.shared.web.dto.LoginResponse;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Authentication endpoints. Issues the JWT only as an HttpOnly cookie plus a
@@ -66,12 +65,9 @@ public class AuthController {
                 .toList();
 
         ResponseCookie jwtCookie = buildCookie(jwtProperties.getCookieName(), token, true, jwtProperties.getExpiration());
-        ResponseCookie xsrfCookie = buildCookie(jwtProperties.getXsrfCookieName(),
-                UUID.randomUUID().toString(), false, jwtProperties.getExpiration());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .header(HttpHeaders.SET_COOKIE, xsrfCookie.toString())
                 .body(ApiResponseBase.<LoginResponse>builder()
                         .status(HttpStatus.OK.value())
                         .message("Autenticación exitosa")

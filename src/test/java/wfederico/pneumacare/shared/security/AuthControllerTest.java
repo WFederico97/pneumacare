@@ -94,8 +94,6 @@ class AuthControllerTest {
                 .andExpect(cookie().value("PNMC_AT", "the.jwt.token"))
                 .andExpect(cookie().httpOnly("PNMC_AT", true))
                 .andExpect(cookie().secure("PNMC_AT", true))
-                .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().httpOnly("XSRF-TOKEN", false))
                 .andExpect(header().stringValues(HttpHeaders.SET_COOKIE,
                         hasItem(containsString("SameSite=Strict"))));
     }
