@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.rate-limit")
 public class RateLimitProperties {
 
-    private int threshold = 10;
+    private int threshold = 100;
 
     private long windowSeconds = 60;
 }

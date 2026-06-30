@@ -9,6 +9,10 @@ app:
   cors:
     allowed-origins:
       - http://localhost:4200
+  # Local dev is a single developer with hot reloads — keep the limiter from
+  # tripping during normal navigation.
+  rate-limit:
+    threshold: 1000
 
 spring:
   jpa:
