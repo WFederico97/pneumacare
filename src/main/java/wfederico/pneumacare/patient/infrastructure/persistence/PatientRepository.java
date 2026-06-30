@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,4 +62,7 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
      * @return the matching patient, or empty if none
      */
     Optional<PatientJpaEntity> findByBed_IdAndClinicalStatus(UUID bedId, ClinicalStatus clinicalStatus);
+
+    /** Count of patients admitted since the given instant (analytics ward). */
+    long countByAdmissionDateAfter(OffsetDateTime since);
 }

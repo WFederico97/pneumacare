@@ -41,4 +41,7 @@ public interface IcuBedRepository extends JpaRepository<IcuBedJpaEntity, UUID> {
      * @return ordered bed list for that ICU and statuses
      */
     List<IcuBedJpaEntity> findByIcu_IdAndStatusInOrderByBedNumberAsc(UUID icuId, List<BedStatus> statuses);
+
+    /** Count of beds in a given status (analytics occupancy). */
+    long countByStatus(BedStatus status);
 }
