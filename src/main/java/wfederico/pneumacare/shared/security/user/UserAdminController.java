@@ -31,7 +31,6 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/users")
-@PreAuthorize("hasRole('CHIEF_OF_GUARD')")
 public class UserAdminController {
 
     private final UserAdminService userAdminService;
@@ -41,16 +40,19 @@ public class UserAdminController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     public ApiResponseBase<List<UserResponse>> list() {
         return ok(userAdminService.list(), "Usuarios obtenidos");
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     public ApiResponseBase<UserResponse> get(@PathVariable UUID id) {
         return ok(userAdminService.get(id), "Usuario obtenido");
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     public ResponseEntity<ApiResponseBase<UserResponse>> create(@Valid @RequestBody CreateUserRequest request,
                                                                 Authentication authentication) {
         UserResponse created = userAdminService.create(request, isAdmin(authentication));
@@ -64,6 +66,7 @@ public class UserAdminController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     public ApiResponseBase<UserResponse> update(@PathVariable UUID id,
                                                 @Valid @RequestBody UpdateUserRequest request,
                                                 Authentication authentication) {
@@ -71,6 +74,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     public ApiResponseBase<Void> disable(@PathVariable UUID id, Authentication authentication) {
         userAdminService.disable(id, callerId(authentication), isAdmin(authentication));
         return ok(null, "Usuario deshabilitado");
