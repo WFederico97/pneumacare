@@ -241,12 +241,18 @@ ApiResponseBase.<MyDto>builder()
 
 ## Event Publishing
 
-All domain events are published through the `EventPublisherPort` outbound port. Which implementation is active depends on the `app.kafka.enabled` flag:
+Events come in two kinds; the publisher you choose depends on whether the event stays inside this (monolith) deployment or must leave it.
+
+**Internal domain events** are consumed in-process by a `@TransactionalEventListener` within the same JVM (e.g. `PatientRiskEvent`, which drives the notification pipeline). Publish them with Spring's `ApplicationEventPublisher` directly. They are delivered in-process **regardless of `app.kafka.enabled`**, so behaviour is identical in dev and prod — Kafka being enabled in production does not reroute them.
+
+**Integration events** must cross a service/deployment boundary or need durability/replay. They are published through the `EventPublisherPort` outbound port, whose active implementation depends on the `app.kafka.enabled` flag:
 
 | Condition | Active Bean | Behaviour |
 |---|---|---|
 | `app.kafka.enabled=false` (default) | `ApplicationEventPublisherAdapter` | In-process Spring `ApplicationEventPublisher`. No broker needed. Use for local dev. |
 | `app.kafka.enabled=true` | `KafkaEventPublisherAdapter` | Sends event as JSON to a derived Kafka topic. `admin.fail-fast=false` so startup does not fail if the broker is temporarily unreachable. |
+
+> ⚠️ `@TransactionalEventListener` only fires for the in-process `ApplicationEventPublisher` path. When `app.kafka.enabled=true`, `EventPublisherPort` routes to Kafka — consume those with a `@KafkaListener`, and avoid publishing inside a `@Transactional` method (dual-write on rollback) by using an after-commit / outbox pattern.
 
 ### Topic naming convention
 
@@ -577,7 +583,7 @@ Set `SPRING_PROFILES_ACTIVE=dev` (default). Requires PostgreSQL and Redis runnin
 ./mvnw spring-boot:run
 ```
 
-Kafka is **not** required locally (`app.kafka.enabled=false` by default). The `ApplicationEventPublisherAdapter` fallback handles all event publishing in-process.
+Kafka is **not** required locally (`app.kafka.enabled=false` by default). Internal domain events already publish in-process via `ApplicationEventPublisher`; integration events sent through `EventPublisherPort` fall back to the in-process `ApplicationEventPublisherAdapter`. Either way, no broker is needed for local dev.
 
 ---
 

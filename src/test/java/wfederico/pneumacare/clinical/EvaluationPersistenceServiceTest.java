@@ -12,8 +12,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
 import wfederico.pneumacare.clinical.application.EvaluationPersistenceService;
+import wfederico.pneumacare.clinical.application.PatientBedLabelPort;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorStrategy;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
@@ -29,11 +31,13 @@ import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationJpaEnt
 import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationRepository;
 import wfederico.pneumacare.clinical.web.dto.CreateEvaluationRequest;
 import wfederico.pneumacare.clinical.web.dto.EvaluationResponse;
+import wfederico.pneumacare.shared.event.PatientRiskEvent;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +89,12 @@ class EvaluationPersistenceServiceTest {
             new PafiResult(212.5, PafiClassification.MILD_ARDS),
             new CstatResult(25.0, CstatInterpretation.LOW));
 
+    /** All indices within safe ranges → no breach, no event. */
+    private static final VentilatorEvaluationResult SAFE_RESULT = new VentilatorEvaluationResult(
+            new RsbiResult(80.0,  RsbiInterpretation.FAVORABLE),
+            new PafiResult(300.0, PafiClassification.AT_RISK),
+            new CstatResult(60.0, CstatInterpretation.NORMAL));
+
     @Mock
     private EvaluationRepository evaluationRepository;
 
@@ -92,6 +103,12 @@ class EvaluationPersistenceServiceTest {
 
     @Mock
     private VentilatorStrategy strategy;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private PatientBedLabelPort patientBedLabelPort;
 
     @InjectMocks
     private EvaluationPersistenceService service;
@@ -299,6 +316,88 @@ class EvaluationPersistenceServiceTest {
                 .satisfies(ex -> assertThat(
                         ((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    // ── Risk event publishing ────────────────────────────────────────────
+
+    @Test
+    @DisplayName("create_thresholdBreached_publishesPatientRiskEventWithIdsBedLabelAndMetrics")
+    void create_breach_publishesEvent() {
+        when(patientBedLabelPort.findBedLabel(PATIENT_ID)).thenReturn(Optional.of("Cama 3"));
+
+        service.create(validRequest);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        assertThat(captor.getValue()).isInstanceOf(PatientRiskEvent.class);
+        PatientRiskEvent event = (PatientRiskEvent) captor.getValue();
+        assertThat(event.patientId()).isEqualTo(PATIENT_ID);
+        assertThat(event.shiftId()).isEqualTo(SHIFT_ID);
+        assertThat(event.bedLabel()).isEqualTo("Cama 3");
+        assertThat(event.breachedMetrics())
+                .containsExactly(new PatientRiskEvent.BreachedMetric("CSTAT", 25.0));
+    }
+
+    @Test
+    @DisplayName("create_thresholdBreached_setsAlertTriggeredTrueOnPersistedEntity")
+    void create_breach_setsAlertTriggered() {
+        service.create(validRequest);
+
+        ArgumentCaptor<EvaluationJpaEntity> captor =
+                ArgumentCaptor.forClass(EvaluationJpaEntity.class);
+        verify(evaluationRepository).save(captor.capture());
+
+        assertThat(captor.getValue().isAlertTriggered()).isTrue();
+    }
+
+    @Test
+    @DisplayName("create_allWithinSafeRanges_doesNotPublishAndAlertTriggeredFalse")
+    void create_noBreach_noEvent() {
+        when(strategy.evaluate(any(VentilatorReading.class))).thenReturn(SAFE_RESULT);
+
+        service.create(validRequest);
+
+        verify(eventPublisher, never()).publishEvent(any());
+
+        ArgumentCaptor<EvaluationJpaEntity> captor =
+                ArgumentCaptor.forClass(EvaluationJpaEntity.class);
+        verify(evaluationRepository).save(captor.capture());
+        assertThat(captor.getValue().isAlertTriggered()).isFalse();
+    }
+
+    @Test
+    @DisplayName("create_multipleThresholdsBreached_publishesSingleEventWithAllMetrics")
+    void create_multipleBreaches_singleEvent() {
+        VentilatorEvaluationResult multi = new VentilatorEvaluationResult(
+                new RsbiResult(120.0, RsbiInterpretation.UNFAVORABLE),
+                new PafiResult(100.0, PafiClassification.MODERATE_ARDS),
+                new CstatResult(60.0, CstatInterpretation.NORMAL));
+        when(strategy.evaluate(any(VentilatorReading.class))).thenReturn(multi);
+
+        service.create(validRequest);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        PatientRiskEvent event = (PatientRiskEvent) captor.getValue();
+        assertThat(event.breachedMetrics()).containsExactly(
+                new PatientRiskEvent.BreachedMetric("RSBI", 120.0),
+                new PatientRiskEvent.BreachedMetric("PAFI", 100.0));
+    }
+
+    @Test
+    @DisplayName("create_thresholdBreachedButNoBedAssigned_publishesEventWithNullBedLabel")
+    void create_breach_nullBedLabel() {
+        when(patientBedLabelPort.findBedLabel(PATIENT_ID)).thenReturn(Optional.empty());
+
+        service.create(validRequest);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        PatientRiskEvent event = (PatientRiskEvent) captor.getValue();
+        assertThat(event.bedLabel()).isNull();
     }
 
     // ── Private helpers ──────────────────────────────────────────────────

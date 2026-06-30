@@ -2,6 +2,7 @@ package wfederico.pneumacare.patient.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
@@ -80,4 +81,15 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
             "identity.identifiers.patientIdentifierType"
     })
     List<PatientJpaEntity> findAllByOrderByAdmissionDateDesc();
+
+    /**
+     * Projects the bed number/label currently assigned to a patient.
+     * The inner join excludes patients with no bed, so the result is empty when
+     * no bed is assigned (or the patient does not exist).
+     *
+     * @param patientId the operational patient UUID
+     * @return the bed number/label, or empty if unassigned or patient absent
+     */
+    @Query("select b.bedNumber from PatientJpaEntity p join p.bed b where p.id = :patientId")
+    Optional<String> findBedLabelByPatientId(UUID patientId);
 }
