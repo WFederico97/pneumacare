@@ -36,9 +36,13 @@ migration). Roles come from the canonical `Role` enum
 | `/api/v1/shifts/{shiftId}/handovers` | POST/GET | ✓ | ✓ | ✓ | |
 | `/api/v1/shifts/{id}/audit` | GET | ✓ | | | ✓ |
 | `/api/v1/shifts/handovers/{id}/audit` | GET | ✓ | | | ✓ |
+| `/api/v1/users` (+ `/{id}`) | GET | ✓ | ✓ | | |
+| `/api/v1/users` (+ `/{id}`) | POST/PUT/DELETE | ✓ | ✓ | | |
 
 Public endpoints require no authentication (see `SecurityConfig`). A blank cell
-means the role is denied that endpoint.
+means the role is denied that endpoint. The `/api/v1/users` gate is
+`CHIEF_OF_GUARD` (ADMIN inherits it); whether a caller may create or modify an
+ADMIN-level user is a finer escalation rule enforced in `UserAdminService`.
 
 **Role hierarchy (enforced by `RoleHierarchy`):**
 `ROLE_ADMIN > ROLE_CHIEF_OF_GUARD > ROLE_THERAPIST` and `ROLE_ADMIN > ROLE_COMPLIANCE`.
