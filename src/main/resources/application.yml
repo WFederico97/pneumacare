@@ -151,6 +151,14 @@ app:
     # requests; tighter per-endpoint limits (e.g. login) belong elsewhere.
     threshold: ${RATE_LIMIT_THRESHOLD:100}
     window-seconds: ${RATE_LIMIT_WINDOW:60}
+  # Outbound n8n webhook for patient-risk alerts (PNMC-99).
+  # Blank url disables dispatch (local dev without n8n).
+  notifications:
+    webhook:
+      url: ${N8N_WEBHOOK_URL:}
+      secret: ${N8N_WEBHOOK_SECRET:}
+      connect-timeout: ${N8N_WEBHOOK_CONNECT_TIMEOUT:3000ms}
+      read-timeout: ${N8N_WEBHOOK_READ_TIMEOUT:3000ms}
 
 # 8. Logging - include traceId/spanId in logs
 logging:
