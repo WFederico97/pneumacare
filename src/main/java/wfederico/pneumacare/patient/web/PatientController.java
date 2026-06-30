@@ -161,6 +161,23 @@ public class PatientController {
     }
 
     @Operation(
+            summary = "List admitted patients",
+            description = "Returns all patients, newest admission first, with plain-text PII " +
+                    "(decrypted transparently). Required scope (staging/prod): `SCOPE_read` — open in dev.")
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
+    @GetMapping
+    public ResponseEntity<ApiResponseBase<java.util.List<PatientResponse>>> listPatients() {
+        java.util.List<PatientResponse> data = service.findAll();
+        return ResponseEntity.ok(
+                ApiResponseBase.<java.util.List<PatientResponse>>builder()
+                        .status(HttpStatus.OK.value())
+                        .message("Patients retrieved successfully")
+                        .data(data)
+                        .traceId(MDC.get("traceId"))
+                        .build());
+    }
+
+    @Operation(
             summary = "Get admitted patient by ID",
             description = """
                     Retrieves an admitted patient by their operational UUID ({@code patients.id}).

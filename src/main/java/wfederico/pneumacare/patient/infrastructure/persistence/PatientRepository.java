@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -65,4 +66,18 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
 
     /** Count of patients admitted since the given instant (analytics ward). */
     long countByAdmissionDateAfter(OffsetDateTime since);
+
+    /**
+     * All patients, newest admission first, with the full PII + bed/ICU graph
+     * eagerly loaded so {@code PatientResponse.from} can map them without N+1
+     * queries or lazy-load failures.
+     */
+    @EntityGraph(attributePaths = {
+            "icu",
+            "bed",
+            "identity",
+            "identity.identifiers",
+            "identity.identifiers.patientIdentifierType"
+    })
+    List<PatientJpaEntity> findAllByOrderByAdmissionDateDesc();
 }

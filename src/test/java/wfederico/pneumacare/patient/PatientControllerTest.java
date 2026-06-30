@@ -298,4 +298,16 @@ class PatientControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/patients — returns the patient list")
+    void listPatients_returnsAll() throws Exception {
+        when(service.findAll()).thenReturn(java.util.List.of(sampleResponse()));
+
+        mockMvc.perform(get("/api/v1/patients"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].patientId").value(PATIENT_ID.toString()))
+                .andExpect(jsonPath("$.data[0].firstName").value(FIRST_NAME));
+    }
 }
