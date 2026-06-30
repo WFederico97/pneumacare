@@ -65,6 +65,9 @@ class AuthControllerTest {
     @MockitoBean
     private StringRedisTemplate redisTemplate;
 
+    @MockitoBean
+    private wfederico.pneumacare.shared.security.user.UserRepository userRepository;
+
     @BeforeEach
     @SuppressWarnings("unchecked")
     void stubRedis() {
@@ -116,6 +119,51 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")
                         .content("{\"username\":\"\",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_validRequest_createsUserSetsCookieAndReturnsProfile() throws Exception {
+        when(userRepository.findByUsername("nurse")).thenReturn(java.util.Optional.empty());
+        when(userRepository.save(any(wfederico.pneumacare.shared.security.user.UserJpaEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtService.issueToken(any(UserPrincipal.class))).thenReturn("the.jwt.token");
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"username\":\"nurse\",\"password\":\"secret12\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("N. Urse"))
+                .andExpect(jsonPath("$.data.roles[0]").value("ROLE_THERAPIST"))
+                .andExpect(content().string(not(containsString("the.jwt.token"))))
+                .andExpect(cookie().value("PNMC_AT", "the.jwt.token"))
+                .andExpect(cookie().httpOnly("PNMC_AT", true));
+    }
+
+    @Test
+    void register_duplicateUsername_returns409() throws Exception {
+        when(userRepository.findByUsername("nurse"))
+                .thenReturn(java.util.Optional.of(new wfederico.pneumacare.shared.security.user.UserJpaEntity()));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"username\":\"nurse\",\"password\":\"secret12\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void register_privilegedRole_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"username\":\"root\",\"password\":\"secret12\",\"displayName\":\"Root\",\"role\":\"ROLE_ADMIN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_shortPassword_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("{\"username\":\"nurse\",\"password\":\"short\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
                 .andExpect(status().isBadRequest());
     }
 
