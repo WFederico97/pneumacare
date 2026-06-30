@@ -44,4 +44,7 @@ public interface IcuBedRepository extends JpaRepository<IcuBedJpaEntity, UUID> {
 
     /** Count of beds in a given status (analytics occupancy). */
     long countByStatus(BedStatus status);
+
+    /** True when the ICU already has a bed with this number (case-insensitive). */
+    boolean existsByIcu_IdAndBedNumberIgnoreCase(UUID icuId, String bedNumber);
 }
