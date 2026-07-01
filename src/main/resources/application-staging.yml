@@ -2,6 +2,10 @@
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  security:
+    # PNMC_JWT_SECRET must be supplied via env/secrets manager (>= 256-bit). Never commit it.
+    bootstrap-admin:
+      enabled: true
 
 spring:
   jpa:

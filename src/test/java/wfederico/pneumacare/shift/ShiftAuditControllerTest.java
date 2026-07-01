@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,9 +90,9 @@ class ShiftAuditControllerTest {
     }
 
     @Test
-    @DisplayName("getShiftAudit with SCOPE_audit returns 200 and the revision history")
-    @WithMockUser(authorities = "SCOPE_audit")
-    void shiftAudit_withAuditScope_returns200() throws Exception {
+    @DisplayName("getShiftAudit with COMPLIANCE returns 200 and the revision history")
+    @WithMockUser(roles = "COMPLIANCE")
+    void shiftAudit_withComplianceRole_returns200() throws Exception {
         when(service.getShiftHistory(SHIFT_ID)).thenReturn(List.of(sampleRevision()));
 
         mockMvc.perform(get(SHIFT_AUDIT_URL))
@@ -101,20 +103,33 @@ class ShiftAuditControllerTest {
     }
 
     @Test
-    @DisplayName("getShiftAudit without SCOPE_audit returns 403")
-    @WithMockUser(authorities = "SCOPE_read")
-    void shiftAudit_withoutAuditScope_returns403() throws Exception {
+    @DisplayName("getShiftAudit with ADMIN returns 200 via role hierarchy (ADMIN > COMPLIANCE)")
+    @WithMockUser(roles = "ADMIN")
+    void shiftAudit_withAdminRole_returns200ViaHierarchy() throws Exception {
+        when(service.getShiftHistory(SHIFT_ID)).thenReturn(List.of(sampleRevision()));
+
+        mockMvc.perform(get(SHIFT_AUDIT_URL))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200));
+    }
+
+    @Test
+    @DisplayName("getShiftAudit without the compliance role returns 403 (problem+json)")
+    @WithMockUser(roles = "THERAPIST")
+    void shiftAudit_withoutComplianceRole_returns403() throws Exception {
         mockMvc.perform(get(SHIFT_AUDIT_URL))
                 .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(403));
     }
 
     @Test
-    @DisplayName("getShiftAudit while anonymous returns 401")
+    @DisplayName("getShiftAudit while anonymous returns 401 (problem+json)")
     @WithAnonymousUser
     void shiftAudit_anonymous_returns401() throws Exception {
         mockMvc.perform(get(SHIFT_AUDIT_URL))
                 .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(401));
     }
 }

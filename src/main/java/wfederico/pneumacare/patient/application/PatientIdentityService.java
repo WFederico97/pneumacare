@@ -131,6 +131,18 @@ public class PatientIdentityService {
                 });
     }
 
+    /**
+     * Lists all patients, newest admission first, with plain-text PII.
+     *
+     * @return the patient list (empty when none exist)
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<PatientResponse> findAll() {
+        return patientRepository.findAllByOrderByAdmissionDateDesc().stream()
+                .map(PatientResponse::from)
+                .toList();
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**

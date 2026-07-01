@@ -13,6 +13,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -84,6 +85,7 @@ public class IcuBedsController {
                     description = "Invalid JWT claims (missing/invalid icu_id).",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @GetMapping
     public ResponseEntity<ApiResponseBase<List<IcuBedResponse>>> getIcuBeds() {
         List<IcuBedResponse> data = service.findBedsForAuthenticatedIcu();
@@ -96,6 +98,7 @@ public class IcuBedsController {
                         .build());
     }
 
+    @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<IcuBedResponse>> createIcuBed(
             @Valid @RequestBody CreateIcuBedRequest request) {

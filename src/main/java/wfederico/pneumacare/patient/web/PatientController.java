@@ -15,6 +15,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -142,6 +143,7 @@ public class PatientController {
                     description = "ICU not found.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<PatientResponse>> createPatient(
             @Valid @RequestBody CreatePatientRequest request) {
@@ -153,6 +155,23 @@ public class PatientController {
                 .body(ApiResponseBase.<PatientResponse>builder()
                         .status(HttpStatus.CREATED.value())
                         .message("Patient admitted successfully")
+                        .data(data)
+                        .traceId(MDC.get("traceId"))
+                        .build());
+    }
+
+    @Operation(
+            summary = "List admitted patients",
+            description = "Returns all patients, newest admission first, with plain-text PII " +
+                    "(decrypted transparently). Required scope (staging/prod): `SCOPE_read` — open in dev.")
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
+    @GetMapping
+    public ResponseEntity<ApiResponseBase<java.util.List<PatientResponse>>> listPatients() {
+        java.util.List<PatientResponse> data = service.findAll();
+        return ResponseEntity.ok(
+                ApiResponseBase.<java.util.List<PatientResponse>>builder()
+                        .status(HttpStatus.OK.value())
+                        .message("Patients retrieved successfully")
                         .data(data)
                         .traceId(MDC.get("traceId"))
                         .build());
@@ -204,6 +223,7 @@ public class PatientController {
                     description = "No admitted patient found with the given UUID.",
                     content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE))
     })
+    @PreAuthorize("hasAnyRole('THERAPIST','COMPLIANCE')")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponseBase<PatientResponse>> getPatient(
             @Parameter(description = "Operational patient UUID (patients.id).",

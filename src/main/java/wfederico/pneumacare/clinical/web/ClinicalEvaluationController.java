@@ -2,6 +2,7 @@ package wfederico.pneumacare.clinical.web;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -59,6 +60,7 @@ public class ClinicalEvaluationController {
      * }
      * }</pre>
      */
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping("/rsbi")
     public ResponseEntity<ApiResponseBase<RsbiResponse>> calculateRsbi(
             @Valid @RequestBody RsbiRequest request) {
@@ -87,6 +89,7 @@ public class ClinicalEvaluationController {
      * }
      * }</pre>
      */
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping("/pafi")
     public ResponseEntity<ApiResponseBase<PafiResponse>> calculatePafi(
             @Valid @RequestBody PafiRequest request) {
@@ -115,6 +118,7 @@ public class ClinicalEvaluationController {
      * }
      * }</pre>
      */
+    @PreAuthorize("hasRole('THERAPIST')")
     @PostMapping("/cstat")
     public ResponseEntity<ApiResponseBase<CstatResponse>> calculateCstat(@Valid @RequestBody CstatRequest request){
         CstatResponse result = evaluationService.calculateCstat(request);

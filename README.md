@@ -66,12 +66,20 @@ Pneumacare is a **hexagonal monolith** (ports and adapters). Each bounded contex
 
 **Dependency rule**: `infra → application → domain`. The `shared/` package is the cross-cutting kernel available to all layers.
 
-> **Status**: Two bounded contexts are implemented — **`patient`** (ICU beds, patient
-> admission with AES-256-GCM-encrypted PII, identifier types) and **`clinical`**
-> (ventilator evaluation persistence and the multi-brand mathematical engine). These
-> deliver the core end-to-end workflow: visualize ICU bed status → admit a patient →
-> submit a strictly-validated respiratory evaluation processed by the ventilator engine.
-> See [API](#api) for the public endpoints.
+> **Status**: Six feature bounded contexts are implemented alongside the `shared`
+> kernel:
+> - **`patient`** — ICU beds, patient admission with AES-256-GCM-encrypted PII, identifier types.
+> - **`clinical`** — ventilator evaluation persistence and the multi-brand mathematical engine (RSBI / PaFi / Cstat).
+> - **`shift`** — medical shifts, shift handovers, and Envers audit trail.
+> - **`procedures`** — SBT (spontaneous breathing trial) and airway events.
+> - **`timeline`** — per-patient clinical timeline aggregation.
+> - **`analytics`** — operational dashboard summary metrics.
+> - **`notification`** — asynchronous patient-risk alert dispatch to an external n8n webhook,
+>   with a `clinical_alerts_log` audit trail (PENDING → DELIVERED / FAILED).
+>
+> Cross-cutting authentication and authorization (self-issued JWT, users, roles) live in
+> `shared/security`. See [API](#api) for the public endpoints and [Security](#security-1)
+> for the auth model.
 
 ---
 
@@ -81,17 +89,33 @@ All endpoints are versioned under `/api/v1` and return the `ApiResponseBase<T>` 
 Interactive docs are served by springdoc at `/swagger-ui.html`; per-resource reference
 docs live in [`docs/api/`](docs/api).
 
-| Method | Path | Description | Auth (staging/prod) | Reference |
-|---|---|---|---|---|
-| `GET`  | `/api/v1/icu-beds`        | List dashboard beds for the caller's ICU (tenant-scoped) | `SCOPE_read`     | [IcuBedsAPI.md](docs/api/IcuBedsAPI.md) |
-| `POST` | `/api/v1/icu-beds`        | Create a bed in the caller's ICU                         | `SCOPE_write`    | [IcuBedsAPI.md](docs/api/IcuBedsAPI.md) |
-| `GET`  | `/api/v1/identifier-types`| List patient identifier types (DNI, CUIL, …)            | none             | [PatientsAPI.md](docs/api/PatientsAPI.md) |
-| `POST` | `/api/v1/patients`        | Admit a patient (atomic; PII encrypted at rest)         | `SCOPE_write`    | [PatientsAPI.md](docs/api/PatientsAPI.md) |
-| `GET`  | `/api/v1/patients/{id}`   | Retrieve an admitted patient (PII decrypted)            | `SCOPE_read`     | [PatientsAPI.md](docs/api/PatientsAPI.md) |
-| `POST` | `/api/v1/evaluations`     | Persist a ventilator evaluation (RSBI/PaFi/Cstat computed) | `ROLE_THERAPIST` | [EvaluationsAPI.md](docs/api/EvaluationsAPI.md) |
-| `GET`  | `/api/health`             | Connectivity / service health check                     | none             | — |
+All authorization below applies in `staging`/`prod`; in the `dev` profile every
+`/api/**` endpoint is open (see [Security](#security-1)). Roles are hierarchical
+(`ROLE_ADMIN` > `ROLE_CHIEF_OF_GUARD` > `ROLE_THERAPIST` / `ROLE_COMPLIANCE`).
 
-In the `dev` profile all `/api/**` endpoints are open (`permitAll`). See [Security](#security-1).
+| Method | Path | Description | Auth |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/login`       | Authenticate; issues the JWT session cookie          | none |
+| `POST` | `/api/v1/auth/register`    | Register a user                                      | none / admin (per config) |
+| `POST` | `/api/v1/auth/logout`      | Clear the session cookie                             | authenticated |
+| `GET`  | `/api/v1/users`           | List users; `GET /{id}`, `PUT /{id}`, `DELETE /{id}` | `ROLE_ADMIN` / `ROLE_CHIEF_OF_GUARD` |
+| `GET`  | `/api/v1/icu-beds`        | List dashboard beds for the caller's ICU (tenant-scoped) | authenticated |
+| `POST` | `/api/v1/icu-beds`        | Create a bed in the caller's ICU                     | authenticated |
+| `GET`  | `/api/v1/identifier-types`| List patient identifier types (DNI, CUIL, …)         | none |
+| `GET`/`POST` | `/api/v1/patients`   | List / admit patients (atomic; PII encrypted at rest) | authenticated |
+| `GET`  | `/api/v1/patients/{id}`   | Retrieve an admitted patient (PII decrypted)         | authenticated |
+| `GET`  | `/api/v1/patients/{id}/timeline` | Aggregated clinical timeline for a patient    | authenticated |
+| `GET`  | `/api/v1/patients/{patientId}/airway-events` | Airway event history           | authenticated |
+| `POST` | `/api/v1/evaluations`     | Persist a ventilator evaluation (RSBI/PaFi/Cstat computed) | `ROLE_THERAPIST` |
+| `POST` | `/api/v1/evaluations/rsbi` \| `/pafi` \| `/cstat` | Ad-hoc single-index calculation      | authenticated |
+| `GET`/`POST` | `/api/v1/shifts`     | List / open medical shifts; `GET /active`, `PATCH /{id}/close` | authenticated |
+| `POST` | `/api/v1/shifts/{shiftId}/handovers` | Record a shift handover                   | authenticated |
+| `POST` | `/api/v1/procedures/sbt`  | Record a spontaneous breathing trial                 | authenticated |
+| `POST` | `/api/v1/procedures/airway` | Record an airway event                             | authenticated |
+| `GET`  | `/api/v1/analytics/summary` | Operational dashboard summary metrics              | authenticated |
+| `GET`  | `/api/v1/health`          | Connectivity / service health check                  | none |
+
+Interactive docs: `/swagger-ui.html`.
 
 ---
 
@@ -114,7 +138,15 @@ src/main/java/wfederico/pneumacare/
 │   ├── infrastructure/persistence/         EvaluationJpaEntity + EvaluationRepository.
 │   └── web/                                EvaluationController + DTOs.
 │
+├── shift/                                  Bounded context: medical shifts, handovers, Envers audit.
+├── procedures/                             Bounded context: SBT and airway events.
+├── timeline/                               Bounded context: per-patient clinical timeline aggregation.
+├── analytics/                             Bounded context: operational dashboard summary metrics.
+├── notification/                           Bounded context: async patient-risk alert dispatch (n8n webhook)
+│                                           + clinical_alerts_log audit (PENDING/DELIVERED/FAILED).
+│
 └── shared/                                 Cross-cutting kernel — shared by all bounded contexts.
+    ├── security/                           Self-issued JWT auth, users/roles, method security, CSRF, bootstrap admin.
     ├── config/
     │   ├── JpaAuditingConfig.java          @EnableJpaAuditing bean.
     │   ├── KafkaConfig.java                Kafka listener factory with DLT error recovery.
@@ -189,8 +221,8 @@ Pure string-constant classes (no instances). Reference from service and exceptio
 
 | Field | Annotation | Type |
 |---|---|---|
-| `createdAt` | `@CreatedDate` | `LocalDateTime` |
-| `updatedAt` | `@LastModifiedDate` | `LocalDateTime` |
+| `createdAt` | `@CreatedDate` | `OffsetDateTime` |
+| `updatedAt` | `@LastModifiedDate` | `OffsetDateTime` |
 
 ### event
 
@@ -241,12 +273,18 @@ ApiResponseBase.<MyDto>builder()
 
 ## Event Publishing
 
-All domain events are published through the `EventPublisherPort` outbound port. Which implementation is active depends on the `app.kafka.enabled` flag:
+Events come in two kinds; the publisher you choose depends on whether the event stays inside this (monolith) deployment or must leave it.
+
+**Internal domain events** are consumed in-process by a `@TransactionalEventListener` within the same JVM (e.g. `PatientRiskEvent`, which drives the notification pipeline). Publish them with Spring's `ApplicationEventPublisher` directly. They are delivered in-process **regardless of `app.kafka.enabled`**, so behaviour is identical in dev and prod — Kafka being enabled in production does not reroute them.
+
+**Integration events** must cross a service/deployment boundary or need durability/replay. They are published through the `EventPublisherPort` outbound port, whose active implementation depends on the `app.kafka.enabled` flag:
 
 | Condition | Active Bean | Behaviour |
 |---|---|---|
 | `app.kafka.enabled=false` (default) | `ApplicationEventPublisherAdapter` | In-process Spring `ApplicationEventPublisher`. No broker needed. Use for local dev. |
 | `app.kafka.enabled=true` | `KafkaEventPublisherAdapter` | Sends event as JSON to a derived Kafka topic. `admin.fail-fast=false` so startup does not fail if the broker is temporarily unreachable. |
+
+> ⚠️ `@TransactionalEventListener` only fires for the in-process `ApplicationEventPublisher` path. When `app.kafka.enabled=true`, `EventPublisherPort` routes to Kafka — consume those with a `@KafkaListener`, and avoid publishing inside a `@Transactional` method (dual-write on rollback) by using an after-commit / outbox pattern.
 
 ### Topic naming convention
 
@@ -393,16 +431,27 @@ All `/api/**` endpoints are **open** (no token required). OAuth2 resource server
 
 ### `staging` and `prod` profiles
 
-OAuth2 JWT validation is active (`spring.security.oauth2.resourceserver.jwt`). Scope-based authorization rules:
+Authentication is a **self-issued JWT** (HS256) — the application is its own issuer;
+there is no external authorization server. `POST /api/v1/auth/login` mints the token
+via `JwtService` and returns it as an **HttpOnly session cookie** (`PNMC_AT`). The token
+is read back on each request by `CookieBearerTokenResolver` and validated by the JWT
+resource server.
 
-| Method | Path pattern | Required authority |
-|---|---|---|
-| `GET` | `/api/health` | None (permit all) |
-| `GET` | `/api/**` | `SCOPE_read` |
-| `POST`, `PUT`, `PATCH`, `DELETE` | `/api/**` | `SCOPE_write` |
-| Any | `/actuator/**`, `/swagger-ui/**`, `/v3/api-docs/**` | None (permit all) |
+Authorization is **role-based** with a hierarchy declared in `AppRoleHierarchy`:
 
-All chains are **stateless** (no sessions) and **CSRF-disabled**.
+```
+ROLE_ADMIN > ROLE_CHIEF_OF_GUARD > ROLE_THERAPIST, ROLE_COMPLIANCE
+```
+
+Endpoint rules are enforced primarily by **method-level `@PreAuthorize`** on the
+controllers (e.g. user administration requires `ROLE_ADMIN` / `ROLE_CHIEF_OF_GUARD`;
+evaluation persistence requires `ROLE_THERAPIST`). `/api/v1/auth/**`,
+`/api/v1/health`, `/actuator/**`, `/swagger-ui/**`, and `/v3/api-docs/**` are open.
+
+CSRF protection uses a **double-submit cookie** (`CsrfCookieFilter` + `XSRF-TOKEN`),
+appropriate for the cookie-based token. A first admin is seeded by the bootstrap-admin
+component when enabled (`BOOTSTRAP_ADMIN_ENABLED`). In `dev`, `DevAuthInjectionFilter`
+injects a stub authenticated principal so the open endpoints behave consistently.
 
 ### CORS
 
@@ -463,7 +512,7 @@ Currently a placeholder (`type Query { _placeholder: String }`). Real domain typ
 | Class | Scope | Notes |
 |---|---|---|
 | `PneumacareApplicationTests` | Context load | `@SpringBootTest`. `@DisabledIfEnvironmentVariable(named = "CI", matches = "true")` — automatically skipped in GitHub Actions. |
-| `TestcontainersConfiguration` | `@TestConfiguration` | `@ServiceConnection` beans for PostgreSQL 17, Redis 7.4, and `apache/kafka-native:3.8.0`. Import into any `@SpringBootTest` class that needs real infrastructure. |
+| `TestcontainersConfiguration` | `@TestConfiguration` | Provides a `@ServiceConnection` **PostgreSQL** container (`postgres:16-alpine`). Import into any `@SpringBootTest` that needs a real database. No Redis/Kafka container is provided — tests that touch `StringRedisTemplate` mock it with `@MockitoBean`. Integration tests are `@Disabled` by convention; run individually with `-Dtest=ClassName`. |
 
 Tests that exercise Kafka must also set `app.kafka.enabled=true`:
 
@@ -577,33 +626,36 @@ Set `SPRING_PROFILES_ACTIVE=dev` (default). Requires PostgreSQL and Redis runnin
 ./mvnw spring-boot:run
 ```
 
-Kafka is **not** required locally (`app.kafka.enabled=false` by default). The `ApplicationEventPublisherAdapter` fallback handles all event publishing in-process.
+Kafka is **not** required locally (`app.kafka.enabled=false` by default). Internal domain events already publish in-process via `ApplicationEventPublisher`; integration events sent through `EventPublisherPort` fall back to the in-process `ApplicationEventPublisherAdapter`. Either way, no broker is needed for local dev.
 
 ---
 
 ## Releases and Docker Image
 
-This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). Current version: **1.1.0**.
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`)
+and GitFlow — releases are cut from `develop` with a minor bump per sprint, tagged on
+`main`. Current version: **1.3.0**.
 
 ### Creating a release
 
 ```bash
-git tag -a v1.1.0 -m "release: v1.1.0 — initial scaffold"
-git push origin v1.1.0
+git tag -a v1.3.0 -m "Release v1.3.0"
+git push origin v1.3.0
 ```
 
-Pushing a `v*.*.*` tag triggers the CI pipeline which runs tests, then builds and pushes to GHCR with four tags:
+Pushing a `v*.*.*` tag triggers the CI pipeline (tests, then build + push to GHCR) and a
+GitHub Actions workflow auto-publishes an immutable GitHub Release with generated notes.
 
 | Tag | Description |
 |---|---|
-| `1.1.0` | Exact semantic version |
-| `1.1` | Latest patch within this minor |
+| `1.3.0` | Exact semantic version |
+| `1.3` | Latest patch within this minor |
 | `sha-<commit>` | Pinned to commit SHA |
 | `latest` | Most recent `main` push or tag |
 
 ### Pulling the image
 
 ```bash
-docker pull ghcr.io/wfederico97/pneumacare:1.1.0
+docker pull ghcr.io/wfederico97/pneumacare:1.3.0
 docker pull ghcr.io/wfederico97/pneumacare:latest
 ```

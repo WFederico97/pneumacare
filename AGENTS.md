@@ -31,6 +31,12 @@ docker compose up
 - **`staging` / `prod`**: Flyway enabled, `ddl-auto: validate` (Flyway owns the schema).
 - **Kafka is disabled by default** (`app.kafka.enabled: false`). Enable via `KAFKA_ENABLED=true` (or set it in `.env`). The `compose.yaml` forces `KAFKA_ENABLED=true` for the `app` service.
 
+## Events
+
+- **Internal domain events** (consumed in-process by `@TransactionalEventListener` within this monolith — e.g. `PatientRiskEvent` → notification pipeline): publish with Spring's `ApplicationEventPublisher`. Delivered in-JVM regardless of `app.kafka.enabled`, so behaviour is identical in dev and prod.
+- **Integration events** (cross-service / durable): publish through `EventPublisherPort`, which routes to Kafka when `KAFKA_ENABLED=true`. Consume Kafka events with `@KafkaListener` — a `@TransactionalEventListener` will not receive them. Never inject `KafkaTemplate` directly in application services.
+- Rule of thumb: same deployment → `ApplicationEventPublisher`; must leave the JVM → `EventPublisherPort`.
+
 ## Tests
 
 - `./mvnw verify -B` runs both unit and integration tests. Integration tests spin up real containers via **Testcontainers** — Docker must be running.

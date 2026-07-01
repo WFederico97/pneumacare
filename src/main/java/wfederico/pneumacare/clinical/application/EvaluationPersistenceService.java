@@ -2,6 +2,7 @@ package wfederico.pneumacare.clinical.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -9,16 +10,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorStrategy;
+import wfederico.pneumacare.clinical.domain.MetricBreach;
+import wfederico.pneumacare.clinical.domain.RiskThresholdEvaluator;
 import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationJpaEntity;
 import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationRepository;
 import wfederico.pneumacare.clinical.web.dto.CreateEvaluationRequest;
 import wfederico.pneumacare.clinical.web.dto.EvaluationResponse;
+import wfederico.pneumacare.shared.event.PatientRiskEvent;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -65,6 +70,8 @@ public class EvaluationPersistenceService {
 
     private final EvaluationRepository evaluationRepository;
     private final VentilatorFactory ventilatorFactory;
+    private final ApplicationEventPublisher eventPublisher;
+    private final PatientBedLabelPort patientBedLabelPort;
 
     /**
      * Persists a new evaluation record with auto-computed clinical index snapshots.
@@ -100,6 +107,11 @@ public class EvaluationPersistenceService {
             throw new BusinessLayerException(ex.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
+        List<MetricBreach> breaches = RiskThresholdEvaluator.evaluate(
+                result.rsbi().value(),
+                result.pafi().value(),
+                result.cstat().value());
+
         EvaluationJpaEntity entity = EvaluationJpaEntity.builder()
                 .patientId(request.patientId())
                 .shiftId(request.shiftId())
@@ -117,6 +129,7 @@ public class EvaluationPersistenceService {
                 .rsbiInterpretation(result.rsbi().interpretation())
                 .pafiClassification(result.pafi().classification())
                 .cstatInterpretation(result.cstat().interpretation())
+                .alertTriggered(!breaches.isEmpty())
                 .createdBy(createdBy)
                 .build();
 
@@ -126,10 +139,37 @@ public class EvaluationPersistenceService {
                 saved.getId(), saved.getPatientId(), request.brand(),
                 saved.getRsbiSnapshot(), saved.getPafiSnapshot(), saved.getCstatSnapshot());
 
+        if (!breaches.isEmpty()) {
+            publishRiskEvent(saved, breaches);
+        }
+
         return EvaluationResponse.from(saved);
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Builds and publishes a {@link PatientRiskEvent} for a persisted evaluation
+     * that breached one or more risk thresholds. Bed label is resolved via the
+     * {@link PatientBedLabelPort}; a patient with no assigned bed yields a null
+     * {@code bedLabel}.
+     */
+    private void publishRiskEvent(EvaluationJpaEntity saved, List<MetricBreach> breaches) {
+        String bedLabel = patientBedLabelPort.findBedLabel(saved.getPatientId()).orElse(null);
+
+        List<PatientRiskEvent.BreachedMetric> metrics = breaches.stream()
+                .map(b -> new PatientRiskEvent.BreachedMetric(b.metric().name(), b.value()))
+                .toList();
+
+        UUID eventId = UUID.randomUUID();
+        PatientRiskEvent event = new PatientRiskEvent(
+                eventId, saved.getPatientId(), saved.getShiftId(), bedLabel, metrics);
+
+        eventPublisher.publishEvent(event);
+
+        log.info("PatientRiskEvent published: eventId={}, patientId={}, shiftId={}, breachedMetrics={}",
+                eventId, saved.getPatientId(), saved.getShiftId(), metrics.size());
+    }
 
     /**
      * Resolves the authenticated user's UUID from the security context.

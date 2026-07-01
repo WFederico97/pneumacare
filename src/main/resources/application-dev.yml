@@ -2,9 +2,17 @@
 app:
   security:
     dev-default-icu-id: cccccccc-0000-0000-0000-000000000001
+    # Dev-only placeholder so the JWT beans construct locally. NOT a secret —
+    # staging/prod supply PNMC_JWT_SECRET from the environment.
+    jwt:
+      secret: dev-only-insecure-jwt-signing-secret-0123456789
   cors:
     allowed-origins:
       - http://localhost:4200
+  # Local dev is a single developer with hot reloads — keep the limiter from
+  # tripping during normal navigation.
+  rate-limit:
+    threshold: 1000
 
 spring:
   jpa:

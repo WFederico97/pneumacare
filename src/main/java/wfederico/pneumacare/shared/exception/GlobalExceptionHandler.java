@@ -3,8 +3,11 @@ package wfederico.pneumacare.shared.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import wfederico.pneumacare.shared.security.ProblemSupport;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 
 /**
@@ -48,22 +52,26 @@ public class GlobalExceptionHandler {
      * but lacks the required role/authority.
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponseBase<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(
+            AccessDeniedException ex, HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         boolean isAnonymous = auth == null || auth instanceof AnonymousAuthenticationToken;
 
-        int status = isAnonymous ? 401 : 403;
-        String message = isAnonymous ? "No autenticado" : "Acceso denegado";
+        HttpStatus status = isAnonymous ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN;
+        String detail = isAnonymous ? "No autenticado" : "Acceso denegado";
 
-        log.warn("Access denied: anonymous={}, reason={}", isAnonymous, ex.getMessage());
+        String uri = request.getRequestURI();
+        if (uri != null && uri.matches("[A-Za-z0-9/_.\\-]*")) {
+            log.warn("Access denied: anonymous={}, uri={}, reason={}",
+                    isAnonymous, uri, ex.getClass().getSimpleName());
+        } else {
+            log.warn("Access denied: anonymous={}, uri=[unsafe], reason={}",
+                    isAnonymous, ex.getClass().getSimpleName());
+        }
 
-        String traceId = MDC.get("traceId");
-        ApiResponseBase<Void> response = ApiResponseBase.<Void>builder()
-                .status(status)
-                .message(message)
-                .traceId(traceId)
-                .build();
-        return ResponseEntity.status(status).body(response);
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(ProblemSupport.body(status, detail, request.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)

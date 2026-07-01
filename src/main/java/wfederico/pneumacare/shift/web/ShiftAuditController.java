@@ -54,7 +54,7 @@ public class ShiftAuditController {
             @ApiResponse(responseCode = "403", description = "Authenticated without the compliance/audit authority.")
     })
     @GetMapping("/{id}/audit")
-    @PreAuthorize("hasAuthority('SCOPE_audit')")
+    @PreAuthorize("hasRole('COMPLIANCE')")
     public ResponseEntity<ApiResponseBase<List<AuditRevisionResponse<ShiftResponse>>>> getShiftAudit(
             @PathVariable UUID id) {
         List<AuditRevisionResponse<ShiftResponse>> data = service.getShiftHistory(id);
@@ -78,7 +78,7 @@ public class ShiftAuditController {
             @ApiResponse(responseCode = "403", description = "Authenticated without the compliance/audit authority.")
     })
     @GetMapping("/handovers/{id}/audit")
-    @PreAuthorize("hasAuthority('SCOPE_audit')")
+    @PreAuthorize("hasRole('COMPLIANCE')")
     public ResponseEntity<ApiResponseBase<List<AuditRevisionResponse<HandoverResponse>>>> getHandoverAudit(
             @PathVariable UUID id) {
         List<AuditRevisionResponse<HandoverResponse>> data = service.getHandoverHistory(id);

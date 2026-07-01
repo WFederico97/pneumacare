@@ -184,6 +184,19 @@ class IcuBedServiceTest {
                         .isEqualTo(HttpStatus.NOT_FOUND));
     }
 
+    @Test
+    @DisplayName("create_duplicateBedNumber_throwsConflict409")
+    void create_duplicateBedNumber_throwsConflict409() {
+        setJwtAuthWithIcuId(ICU_ID.toString());
+        CreateIcuBedRequest request = new CreateIcuBedRequest("  BED-004 ");
+        when(icuBedRepository.existsByIcu_IdAndBedNumberIgnoreCase(ICU_ID, "BED-004")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+    }
+
     private void setJwtAuthWithIcuId(String icuIdClaim) {
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")

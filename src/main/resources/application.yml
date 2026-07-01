@@ -35,13 +35,6 @@ spring:
       port: ${REDIS_PORT:6379}
       # password: ${REDIS_PASSWORD:} # Uncomment if redis has password enabled
 
-  # 3. OAuth2 Resource Server (JWT)
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:9000}
-
   # 4. Kafka — disabled by default for local dev without Docker.
   #    Set KAFKA_ENABLED=true (and KAFKA_BOOTSTRAP_SERVERS) when running the full stack.
   kafka:
@@ -134,13 +127,38 @@ app:
   security:
     encryption:
       aes-secret-key: ${AES_SECRET_KEY:}
+    # Self-issued JWT (HS256). secret must be >= 256-bit (32 bytes); supply via
+    # PNMC_JWT_SECRET in staging/prod. Never commit a production secret.
+    jwt:
+      secret: ${PNMC_JWT_SECRET:}
+      expiration: PT8H
+      cookie-name: PNMC_AT
+      xsrf-cookie-name: XSRF-TOKEN
+    bootstrap-admin:
+      # Disabled by default (dev/test). Staging/prod profiles enable it.
+      enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
+      username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+      display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:System Administrator}
+      # No default — must be supplied in staging/prod. Rotate on first login.
+      initial-password: ${PNMC_BOOTSTRAP_ADMIN_PASSWORD:}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topics:
       prefix: ${KAFKA_TOPICS_PREFIX:pneumacare.events}
   rate-limit:
-    threshold: ${RATE_LIMIT_THRESHOLD:10}
+    # Per-IP fixed window. A single SPA page fans out several parallel API
+    # calls, so the global limit must comfortably exceed a page's worth of
+    # requests; tighter per-endpoint limits (e.g. login) belong elsewhere.
+    threshold: ${RATE_LIMIT_THRESHOLD:100}
     window-seconds: ${RATE_LIMIT_WINDOW:60}
+  # Outbound n8n webhook for patient-risk alerts (PNMC-99).
+  # Blank url disables dispatch (local dev without n8n).
+  notifications:
+    webhook:
+      url: ${N8N_WEBHOOK_URL:}
+      secret: ${N8N_WEBHOOK_SECRET:}
+      connect-timeout: ${N8N_WEBHOOK_CONNECT_TIMEOUT:3000ms}
+      read-timeout: ${N8N_WEBHOOK_READ_TIMEOUT:3000ms}
 
 # 8. Logging - include traceId/spanId in logs
 logging:

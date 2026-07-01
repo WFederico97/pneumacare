@@ -75,12 +75,22 @@ public class IcuBedService {
 
     public IcuBedResponse create(CreateIcuBedRequest request) {
         UUID icuId = extractIcuIdFromAuthentication();
+
+        // Normalize: trim and collapse internal whitespace so "BED  4 " == "BED 4".
+        String bedNumber = request.bedNumber().trim().replaceAll("\\s+", " ");
+        if (bedNumber.isEmpty()) {
+            throw new BusinessLayerException("El número de cama es obligatorio", HttpStatus.BAD_REQUEST);
+        }
+        if (icuBedRepository.existsByIcu_IdAndBedNumberIgnoreCase(icuId, bedNumber)) {
+            throw new BusinessLayerException("Ya existe una cama con ese número", HttpStatus.CONFLICT);
+        }
+
         IcuJpaEntity icu = icuRepository.findById(icuId)
                 .orElseThrow(() -> new BusinessLayerException("No se encontró la UCI con id: " + icuId, HttpStatus.NOT_FOUND));
 
         IcuBedJpaEntity bed = IcuBedJpaEntity.builder()
                 .icu(icu)
-                .bedNumber(request.bedNumber().trim())
+                .bedNumber(bedNumber)
                 .status(BedStatus.AVAILABLE)
                 .build();
 
