@@ -4,8 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import wfederico.pneumacare.notification.application.AlertAuditPort;
 import wfederico.pneumacare.notification.application.AlertNotification;
 import wfederico.pneumacare.notification.application.PatientRiskAlertListener;
 import wfederico.pneumacare.notification.application.WebhookNotificationPort;
@@ -20,7 +22,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +39,9 @@ class PatientRiskAlertListenerTest {
     @Mock
     private WebhookNotificationPort webhookNotificationPort;
 
+    @Mock
+    private AlertAuditPort alertAuditPort;
+
     private final Clock clock = Clock.fixed(FIXED, ZoneOffset.UTC);
     private PatientRiskAlertListener listener;
 
@@ -44,7 +52,7 @@ class PatientRiskAlertListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new PatientRiskAlertListener(webhookNotificationPort, clock);
+        listener = new PatientRiskAlertListener(webhookNotificationPort, alertAuditPort, clock);
     }
 
     @Test
@@ -64,10 +72,35 @@ class PatientRiskAlertListenerTest {
     }
 
     @Test
-    void onPatientRiskEvent_portThrows_exceptionIsSwallowed() {
+    void onPatientRiskEvent_success_recordsPendingThenSendsThenMarksDelivered() {
+        listener.onPatientRiskEvent(event());
+
+        InOrder inOrder = inOrder(alertAuditPort, webhookNotificationPort);
+        inOrder.verify(alertAuditPort).recordPending(eq(EVENT), any());
+        inOrder.verify(webhookNotificationPort).send(any());
+        inOrder.verify(alertAuditPort).markDelivered(EVENT);
+        verify(alertAuditPort, never()).markFailed(any());
+    }
+
+    @Test
+    void onPatientRiskEvent_sendThrows_marksFailedAndSwallows() {
         doThrow(new RuntimeException("connection refused"))
                 .when(webhookNotificationPort).send(any());
 
         assertThatCode(() -> listener.onPatientRiskEvent(event())).doesNotThrowAnyException();
+
+        verify(alertAuditPort).markFailed(EVENT);
+        verify(alertAuditPort, never()).markDelivered(any());
+    }
+
+    @Test
+    void onPatientRiskEvent_recordPendingThrows_dispatchStillProceeds() {
+        doThrow(new RuntimeException("db down"))
+                .when(alertAuditPort).recordPending(eq(EVENT), any());
+
+        assertThatCode(() -> listener.onPatientRiskEvent(event())).doesNotThrowAnyException();
+
+        verify(webhookNotificationPort).send(any());
+        verify(alertAuditPort).markDelivered(EVENT);
     }
 }
