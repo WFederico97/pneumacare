@@ -6,6 +6,7 @@ import wfederico.pneumacare.shared.event.PatientRiskEvent;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,5 +41,32 @@ class AlertNotificationTest {
                 List.of(new PatientRiskEvent.BreachedMetric("CSTAT", 25.0)));
 
         assertThat(AlertNotification.from(event, TS).bedLabel()).isNull();
+    }
+
+    @Test
+    void toPayloadMap_producesSnakeCaseContract() {
+        PatientRiskEvent event = new PatientRiskEvent(EVENT, PATIENT, SHIFT, "Cama 3",
+                List.of(new PatientRiskEvent.BreachedMetric("RSBI", 110.0)));
+
+        Map<String, Object> body = AlertNotification.from(event, TS).toPayloadMap();
+
+        assertThat(body).containsEntry("patient_id", PATIENT)
+                .containsEntry("shift_id", SHIFT)
+                .containsEntry("bed_label", "Cama 3")
+                .containsEntry("timestamp", TS.toString());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> metrics = (List<Map<String, Object>>) body.get("breached_metrics");
+        assertThat(metrics).containsExactly(Map.of("metric_name", "RSBI", "value", 110.0));
+    }
+
+    @Test
+    void toPayloadMap_nullBedLabel_keyPresentWithNullValue() {
+        PatientRiskEvent event = new PatientRiskEvent(EVENT, PATIENT, SHIFT, null,
+                List.of(new PatientRiskEvent.BreachedMetric("CSTAT", 25.0)));
+
+        Map<String, Object> body = AlertNotification.from(event, TS).toPayloadMap();
+
+        assertThat(body).containsKey("bed_label");
+        assertThat(body.get("bed_label")).isNull();
     }
 }
