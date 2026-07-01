@@ -12,13 +12,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AlertNotificationTest {
 
+    private static final UUID EVENT   = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
     private static final UUID PATIENT = UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     private static final UUID SHIFT   = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
     private static final Instant TS   = Instant.parse("2026-06-30T18:45:00Z");
 
     @Test
     void from_mapsAllFieldsIncludingMetricsAndTimestamp() {
-        PatientRiskEvent event = new PatientRiskEvent(PATIENT, SHIFT, "Cama 3",
+        PatientRiskEvent event = new PatientRiskEvent(EVENT, PATIENT, SHIFT, "Cama 3",
                 List.of(new PatientRiskEvent.BreachedMetric("RSBI", 110.0),
                         new PatientRiskEvent.BreachedMetric("PAFI", 100.0)));
 
@@ -35,7 +36,7 @@ class AlertNotificationTest {
 
     @Test
     void from_nullBedLabel_preserved() {
-        PatientRiskEvent event = new PatientRiskEvent(PATIENT, SHIFT, null,
+        PatientRiskEvent event = new PatientRiskEvent(EVENT, PATIENT, SHIFT, null,
                 List.of(new PatientRiskEvent.BreachedMetric("CSTAT", 25.0)));
 
         assertThat(AlertNotification.from(event, TS).bedLabel()).isNull();

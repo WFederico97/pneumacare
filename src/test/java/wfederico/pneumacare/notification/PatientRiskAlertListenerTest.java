@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class PatientRiskAlertListenerTest {
 
+    private static final UUID EVENT   = UUID.fromString("dddddddd-0000-0000-0000-000000000001");
     private static final UUID PATIENT = UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     private static final UUID SHIFT   = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
     private static final Instant FIXED = Instant.parse("2026-06-30T18:45:00Z");
@@ -37,7 +38,7 @@ class PatientRiskAlertListenerTest {
     private PatientRiskAlertListener listener;
 
     private static PatientRiskEvent event() {
-        return new PatientRiskEvent(PATIENT, SHIFT, "Cama 3",
+        return new PatientRiskEvent(EVENT, PATIENT, SHIFT, "Cama 3",
                 List.of(new PatientRiskEvent.BreachedMetric("RSBI", 110.0)));
     }
 
