@@ -340,6 +340,20 @@ class EvaluationPersistenceServiceTest {
     }
 
     @Test
+    @DisplayName("create_thresholdBreached_publishedEventCarriesNonNullEventId")
+    void create_breach_publishesEventWithEventId() {
+        when(patientBedLabelPort.findBedLabel(PATIENT_ID)).thenReturn(Optional.of("Cama 3"));
+
+        service.create(validRequest);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        PatientRiskEvent event = (PatientRiskEvent) captor.getValue();
+        assertThat(event.eventId()).isNotNull();
+    }
+
+    @Test
     @DisplayName("create_thresholdBreached_setsAlertTriggeredTrueOnPersistedEntity")
     void create_breach_setsAlertTriggered() {
         service.create(validRequest);

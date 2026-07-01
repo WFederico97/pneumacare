@@ -15,12 +15,14 @@ import java.util.UUID;
  * values — no PII. {@code bedLabel} may be {@code null} when the patient has no
  * bed currently assigned.
  *
+ * @param eventId         unique id for this alert event; the audit-log correlation key
  * @param patientId       the evaluated patient (raw UUID, cross-context)
  * @param shiftId         the medical shift the evaluation belongs to
  * @param bedLabel        human-readable bed identifier (e.g. "Cama 3"), or null
  * @param breachedMetrics one entry per metric that crossed its threshold
  */
 public record PatientRiskEvent(
+        UUID eventId,
         UUID patientId,
         UUID shiftId,
         String bedLabel,

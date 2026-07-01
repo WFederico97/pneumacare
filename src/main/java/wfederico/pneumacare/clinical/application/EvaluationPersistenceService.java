@@ -161,13 +161,14 @@ public class EvaluationPersistenceService {
                 .map(b -> new PatientRiskEvent.BreachedMetric(b.metric().name(), b.value()))
                 .toList();
 
+        UUID eventId = UUID.randomUUID();
         PatientRiskEvent event = new PatientRiskEvent(
-                saved.getPatientId(), saved.getShiftId(), bedLabel, metrics);
+                eventId, saved.getPatientId(), saved.getShiftId(), bedLabel, metrics);
 
         eventPublisher.publishEvent(event);
 
-        log.info("PatientRiskEvent published: patientId={}, shiftId={}, breachedMetrics={}",
-                saved.getPatientId(), saved.getShiftId(), metrics.size());
+        log.info("PatientRiskEvent published: eventId={}, patientId={}, shiftId={}, breachedMetrics={}",
+                eventId, saved.getPatientId(), saved.getShiftId(), metrics.size());
     }
 
     /**
