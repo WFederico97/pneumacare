@@ -24,4 +24,8 @@ public final class RequestMessageConstants {
     public static final String TIMELINE_RETRIEVED = "Línea de tiempo del paciente recuperada exitosamente";
     public static final String SHIFT_AUDIT_RETRIEVED = "Historial de auditoría del turno recuperado exitosamente";
     public static final String HANDOVER_AUDIT_RETRIEVED = "Historial de auditoría de la nota de relevo recuperado exitosamente";
+    public static final String VENTILATOR_CREATED = "Ventilador registrado exitosamente";
+    public static final String VENTILATORS_RETRIEVED = "Ventiladores recuperados exitosamente";
+    public static final String VENTILATOR_RETRIEVED = "Ventilador recuperado exitosamente";
+    public static final String VENTILATOR_STATUS_UPDATED = "Estado del ventilador actualizado exitosamente";
 }
