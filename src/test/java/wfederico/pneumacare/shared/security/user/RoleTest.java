@@ -17,12 +17,13 @@ class RoleTest {
     }
 
     @Test
-    void declaresTheFourCanonicalRoles() {
+    void declaresTheCanonicalRoles() {
         assertThat(Role.values())
                 .containsExactlyInAnyOrder(
                         Role.ROLE_ADMIN,
                         Role.ROLE_CHIEF_OF_GUARD,
                         Role.ROLE_THERAPIST,
-                        Role.ROLE_COMPLIANCE);
+                        Role.ROLE_COMPLIANCE,
+                        Role.ROLE_DIRECTOR);
     }
 }
