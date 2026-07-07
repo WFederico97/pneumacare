@@ -5,12 +5,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import wfederico.pneumacare.inventory.domain.VentilatorStatus;
 
 import java.util.UUID;
 
 public interface PhysicalVentilatorRepository extends JpaRepository<PhysicalVentilatorJpaEntity, UUID> {
 
     boolean existsBySerialNumber(String serialNumber);
+
+    /** Count of ventilators in a given hardware status (analytics maintenance). */
+    long countByStatus(VentilatorStatus status);
 
     Page<PhysicalVentilatorJpaEntity> findByIcuId(UUID icuId, Pageable pageable);
 
