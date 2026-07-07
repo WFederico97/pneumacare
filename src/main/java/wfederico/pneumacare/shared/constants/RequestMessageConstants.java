@@ -30,4 +30,5 @@ public final class RequestMessageConstants {
     public static final String VENTILATOR_STATUS_UPDATED = "Estado del ventilador actualizado exitosamente";
     public static final String ASSET_ASSIGNED = "Ventilador asignado exitosamente";
     public static final String ASSET_UNASSIGNED = "Ventilador liberado exitosamente";
+    public static final String INSIGHT_RETRIEVED = "Insight del consultor clínico recuperado exitosamente";
 }
