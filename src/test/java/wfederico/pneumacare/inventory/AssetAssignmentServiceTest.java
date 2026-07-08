@@ -15,6 +15,7 @@ import wfederico.pneumacare.inventory.infrastructure.persistence.AssetAssignment
 import wfederico.pneumacare.inventory.infrastructure.persistence.AssetAssignmentRepository;
 import wfederico.pneumacare.inventory.infrastructure.persistence.PhysicalVentilatorJpaEntity;
 import wfederico.pneumacare.inventory.infrastructure.persistence.PhysicalVentilatorRepository;
+import wfederico.pneumacare.inventory.web.dto.ActiveAssignmentResponse;
 import wfederico.pneumacare.inventory.web.dto.AssetAssignmentResponse;
 import wfederico.pneumacare.inventory.web.dto.AssignAssetRequest;
 import wfederico.pneumacare.inventory.web.dto.UnassignAssetRequest;
@@ -208,5 +209,28 @@ class AssetAssignmentServiceTest {
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("findActiveForPatient: returns the active assignment with the ventilator serial")
+    void findActiveForPatientReturnsAssignment() {
+        when(assignmentRepository.findByPatientIdAndReleasedAtIsNull(PATIENT_ID))
+                .thenReturn(Optional.of(savedAssignment(null)));
+        when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
+
+        ActiveAssignmentResponse response = service.findActiveForPatient(PATIENT_ID);
+
+        assertThat(response).isNotNull();
+        assertThat(response.ventilatorId()).isEqualTo(VENTILATOR_ID);
+        assertThat(response.serialNumber()).isEqualTo("SN-001");
+    }
+
+    @Test
+    @DisplayName("findActiveForPatient: returns null when the patient has no active assignment")
+    void findActiveForPatientNoneReturnsNull() {
+        when(assignmentRepository.findByPatientIdAndReleasedAtIsNull(PATIENT_ID))
+                .thenReturn(Optional.empty());
+
+        assertThat(service.findActiveForPatient(PATIENT_ID)).isNull();
     }
 }

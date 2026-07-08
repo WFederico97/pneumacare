@@ -12,6 +12,9 @@ public interface AssetAssignmentRepository extends JpaRepository<AssetAssignment
     /** The active (unreleased) assignment for a ventilator, if any. */
     Optional<AssetAssignmentJpaEntity> findByVentilatorIdAndReleasedAtIsNull(UUID ventilatorId);
 
+    /** The active (unreleased) assignment for a patient, if any. */
+    Optional<AssetAssignmentJpaEntity> findByPatientIdAndReleasedAtIsNull(UUID patientId);
+
     /** True if the patient already holds an active assignment. */
     boolean existsByPatientIdAndReleasedAtIsNull(UUID patientId);
 
