@@ -13,6 +13,7 @@ import wfederico.pneumacare.inventory.infrastructure.persistence.AssetAssignment
 import wfederico.pneumacare.inventory.infrastructure.persistence.AssetAssignmentRepository;
 import wfederico.pneumacare.inventory.infrastructure.persistence.PhysicalVentilatorJpaEntity;
 import wfederico.pneumacare.inventory.infrastructure.persistence.PhysicalVentilatorRepository;
+import wfederico.pneumacare.inventory.web.dto.ActiveAssignmentResponse;
 import wfederico.pneumacare.inventory.web.dto.AssetAssignmentResponse;
 import wfederico.pneumacare.inventory.web.dto.AssignAssetRequest;
 import wfederico.pneumacare.inventory.web.dto.UnassignAssetRequest;
@@ -100,6 +101,22 @@ public class AssetAssignmentService {
         AssetAssignmentJpaEntity saved = assignmentRepository.save(assignment);
         ventilatorRepository.save(ventilator);
         return AssetAssignmentResponse.from(saved, ventilator.getStatus());
+    }
+
+    /**
+     * The patient's current (unreleased) assignment with the ventilator serial,
+     * or {@code null} when no ventilator is assigned.
+     */
+    @Transactional(readOnly = true)
+    public ActiveAssignmentResponse findActiveForPatient(UUID patientId) {
+        return assignmentRepository.findByPatientIdAndReleasedAtIsNull(patientId)
+                .map(assignment -> new ActiveAssignmentResponse(
+                        assignment.getVentilatorId(),
+                        ventilatorRepository.findById(assignment.getVentilatorId())
+                                .map(PhysicalVentilatorJpaEntity::getSerialNumber)
+                                .orElse(null),
+                        assignment.getAssignedAt()))
+                .orElse(null);
     }
 
     /**
