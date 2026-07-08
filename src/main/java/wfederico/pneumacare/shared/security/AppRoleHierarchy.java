@@ -14,7 +14,7 @@ public final class AppRoleHierarchy {
 
     public static RoleHierarchy create() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
-                .role("ADMIN").implies("CHIEF_OF_GUARD", "COMPLIANCE")
+                .role("ADMIN").implies("CHIEF_OF_GUARD", "COMPLIANCE", "DIRECTOR")
                 .role("CHIEF_OF_GUARD").implies("THERAPIST")
                 .build();
     }

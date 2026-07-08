@@ -18,7 +18,8 @@ public enum Role {
     ROLE_ADMIN,
     ROLE_CHIEF_OF_GUARD,
     ROLE_THERAPIST,
-    ROLE_COMPLIANCE;
+    ROLE_COMPLIANCE,
+    ROLE_DIRECTOR;
 
     /** @return this role as a Spring Security authority (value == enum name). */
     public GrantedAuthority authority() {
