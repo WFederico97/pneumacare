@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import wfederico.pneumacare.inventory.application.AssetAssignmentService;
 import wfederico.pneumacare.inventory.domain.VentilatorStatus;
 import wfederico.pneumacare.inventory.web.AssetAssignmentController;
+import wfederico.pneumacare.inventory.web.dto.ActiveAssignmentResponse;
 import wfederico.pneumacare.inventory.web.dto.AssetAssignmentResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 import wfederico.pneumacare.shared.security.SecurityConfig;
@@ -26,9 +27,11 @@ import wfederico.pneumacare.shared.security.SecurityConfig;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -165,5 +168,27 @@ class AssetAssignmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(UNASSIGN_BODY))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("active returns 200 with the assignment when one exists")
+    void activeReturnsAssignment() throws Exception {
+        when(service.findActiveForPatient(PATIENT_ID))
+                .thenReturn(new ActiveAssignmentResponse(VENTILATOR_ID, "SN-001", OffsetDateTime.now()));
+
+        mockMvc.perform(get("/api/v1/assets/active").param("patientId", PATIENT_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.serialNumber").value("SN-001"))
+                .andExpect(jsonPath("$.data.ventilatorId").value(VENTILATOR_ID.toString()));
+    }
+
+    @Test
+    @DisplayName("active returns 200 with null data when no ventilator is assigned")
+    void activeReturnsNullWhenNone() throws Exception {
+        when(service.findActiveForPatient(PATIENT_ID)).thenReturn(null);
+
+        mockMvc.perform(get("/api/v1/assets/active").param("patientId", PATIENT_ID.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(nullValue()));
     }
 }
