@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.CstatResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.PafiResult;
@@ -92,7 +93,23 @@ public class ClinicalConsultantInsightService {
                 new RsbiResult(toDouble(e.getRsbiSnapshot()), e.getRsbiInterpretation()),
                 new PafiResult(toDouble(e.getPafiSnapshot()), e.getPafiClassification()),
                 new CstatResult(toDouble(e.getCstatSnapshot()), e.getCstatInterpretation()));
-        return consultantService.compose(result).text();
+        return consultantService.compose(result, drivingPressureBand(e)).text();
+    }
+
+    /**
+     * Derives the driving-pressure band (ΔP = Pplat − PEEP) when both pressures
+     * are recorded and physiologically valid; {@code null} otherwise, so the
+     * consultant simply skips driving-pressure rules.
+     */
+    private static DrivingPressureBand drivingPressureBand(EvaluationJpaEntity e) {
+        if (e.getPplat() == null || e.getPeep() == null) {
+            return null;
+        }
+        double drivingPressure = e.getPplat().subtract(e.getPeep()).doubleValue();
+        if (drivingPressure <= 0) {
+            return null;
+        }
+        return DrivingPressureBand.from(drivingPressure);
     }
 
     private static double toDouble(BigDecimal value) {

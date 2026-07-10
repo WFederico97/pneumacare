@@ -11,6 +11,7 @@ import wfederico.pneumacare.clinical.application.ClinicalConsultantInsightServic
 import wfederico.pneumacare.clinical.application.ClinicalConsultantService;
 import wfederico.pneumacare.clinical.domain.ConsultantGuidance;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,7 +76,7 @@ class ClinicalConsultantInsightServiceTest {
     void cacheMissComposesAndPersists() {
         when(insightRepository.findByEvaluationId(EVAL_ID)).thenReturn(Optional.empty());
         when(evaluationRepository.findById(EVAL_ID)).thenReturn(Optional.of(evaluation()));
-        when(consultantService.compose(any(VentilatorEvaluationResult.class)))
+        when(consultantService.compose(any(VentilatorEvaluationResult.class), nullable(DrivingPressureBand.class)))
                 .thenReturn(new ConsultantGuidance(COMPOSED, List.of("Yang & Tobin")));
         when(insightRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -117,7 +119,7 @@ class ClinicalConsultantInsightServiceTest {
         when(insightRepository.findByEvaluationId(EVAL_ID))
                 .thenReturn(Optional.empty(), Optional.of(stored(COMPOSED)));
         when(evaluationRepository.findById(EVAL_ID)).thenReturn(Optional.of(evaluation()));
-        when(consultantService.compose(any(VentilatorEvaluationResult.class)))
+        when(consultantService.compose(any(VentilatorEvaluationResult.class), nullable(DrivingPressureBand.class)))
                 .thenReturn(new ConsultantGuidance(COMPOSED, List.of("Yang & Tobin")));
         when(insightRepository.saveAndFlush(any()))
                 .thenThrow(new DataIntegrityViolationException("duplicate evaluation_id"));
