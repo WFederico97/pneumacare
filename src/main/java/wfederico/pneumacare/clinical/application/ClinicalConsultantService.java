@@ -5,8 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import wfederico.pneumacare.clinical.domain.ConsultantGuidance;
+import wfederico.pneumacare.clinical.domain.CstatInterpretation;
 import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
+import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RiskMetric;
+import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.infrastructure.persistence.ClinicalCombinationRuleJpaEntity;
 import wfederico.pneumacare.clinical.infrastructure.persistence.ClinicalCombinationRuleRepository;
@@ -19,6 +22,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Deterministic, DB-backed clinical consultant.
@@ -44,13 +48,18 @@ import java.util.Set;
 public class ClinicalConsultantService {
 
     /** Returned when no metric or rule matches any reference entry. */
-    static final String SAFE_DEFAULT = "insufficient reference data";
+    static final String SAFE_DEFAULT = "Sin datos de referencia suficientes para una recomendación.";
 
-    /** Guidance is capped at this many sentences for conciseness. */
+    /** Guidance is capped at this many findings for conciseness. */
     private static final int MAX_SENTENCES = 4;
 
     /** Splits a {@code source_ref} that bundles several citations. */
     private static final String SOURCE_SEPARATOR = "; ";
+
+    /** Weaning-verdict headlines, shown first so the therapist reads the stance up front. */
+    private static final String VERDICT_DEFER = "Diferir la SBT";
+    private static final String VERDICT_MONITOR = "SBT bajo monitoreo estrecho";
+    private static final String VERDICT_READY = "Compatible con destete";
 
     private final MedicalReferenceRepository referenceRepository;
     private final ClinicalCombinationRuleRepository combinationRuleRepository;
@@ -115,8 +124,42 @@ public class ClinicalConsultantService {
         List<String> chosen = guidanceSentences.stream().distinct().limit(MAX_SENTENCES).toList();
         List<String> citations = distinctCitations(sources, chosen, guidanceSentences);
 
-        String text = String.join(" ", chosen) + " Ref: " + String.join(SOURCE_SEPARATOR, citations);
-        return new ConsultantGuidance(text, citations);
+        // Format: verdict headline, then one bullet per finding (most urgent first),
+        // then a muted sources line — scannable at the bedside.
+        StringBuilder text = new StringBuilder();
+        text.append(weaningVerdict(result, drivingPressure)).append("\n\n");
+        text.append(chosen.stream().map(s -> "• " + s).collect(Collectors.joining("\n")));
+        text.append("\n\nFuentes: ").append(String.join(SOURCE_SEPARATOR, citations));
+        return new ConsultantGuidance(text.toString(), citations);
+    }
+
+    /**
+     * Deterministic weaning stance derived from the interpretation bands, shown as
+     * the headline so the therapist sees the bottom line before the detail:
+     * defer, proceed under close monitoring, or ready to wean.
+     */
+    private String weaningVerdict(VentilatorEvaluationResult result, DrivingPressureBand drivingPressure) {
+        RsbiInterpretation rsbi = result.rsbi().interpretation();
+        PafiClassification pafi = result.pafi().classification();
+        CstatInterpretation cstat = result.cstat().interpretation();
+
+        boolean defer = rsbi == RsbiInterpretation.UNFAVORABLE
+                || pafi == PafiClassification.MODERATE_ARDS
+                || pafi == PafiClassification.SEVERE_ARDS
+                || cstat == CstatInterpretation.LOW;
+        if (defer) {
+            return VERDICT_DEFER;
+        }
+
+        boolean monitor = rsbi == RsbiInterpretation.BORDERLINE
+                || pafi == PafiClassification.AT_RISK
+                || pafi == PafiClassification.MILD_ARDS
+                || drivingPressure == DrivingPressureBand.HIGH;
+        if (monitor) {
+            return VERDICT_MONITOR;
+        }
+
+        return VERDICT_READY;
     }
 
     /**

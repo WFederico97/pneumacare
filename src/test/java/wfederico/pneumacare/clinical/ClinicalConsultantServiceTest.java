@@ -76,8 +76,9 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.UNFAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).contains("RSBI above 105 predicts weaning failure.");
-        assertThat(guidance.text()).contains("Ref: Yang & Tobin 1991");
+        assertThat(guidance.text()).startsWith("Diferir la SBT");
+        assertThat(guidance.text()).contains("• RSBI above 105 predicts weaning failure.");
+        assertThat(guidance.text()).contains("Fuentes: Yang & Tobin 1991");
         assertThat(guidance.sources()).containsExactly("Yang & Tobin 1991");
         verifyNoMoreInteractions(referenceRepository);
     }
@@ -92,7 +93,7 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).isEqualTo("insufficient reference data");
+        assertThat(guidance.text()).isEqualTo("Sin datos de referencia suficientes para una recomendación.");
         assertThat(guidance.sources()).isEmpty();
     }
 
@@ -109,8 +110,8 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.UNFAVORABLE, PafiClassification.SEVERE_ARDS, CstatInterpretation.LOW));
 
-        // Highest priority (PaFi 100) first, then RSBI 70, then Cstat 50.
-        assertThat(guidance.text()).startsWith("PaFi sentence. RSBI sentence. Cstat sentence.");
+        // Verdict headline, then highest priority (PaFi 100) first, then RSBI 70, then Cstat 50.
+        assertThat(guidance.text()).startsWith("Diferir la SBT\n\n• PaFi sentence.\n• RSBI sentence.\n• Cstat sentence.");
         assertThat(guidance.text().indexOf("PaFi sentence."))
                 .isLessThan(guidance.text().indexOf("RSBI sentence."));
         assertThat(guidance.text().indexOf("RSBI sentence."))
@@ -132,7 +133,7 @@ class ClinicalConsultantServiceTest {
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.MODERATE_ARDS, CstatInterpretation.LOW));
 
         assertThat(guidance.sources()).containsExactly("Berlin 2012");
-        assertThat(guidance.text()).endsWith("Ref: Berlin 2012");
+        assertThat(guidance.text()).endsWith("Fuentes: Berlin 2012");
     }
 
     @Test
@@ -149,7 +150,7 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.MODERATE_ARDS, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).startsWith("Oxygenation gates weaning. Moderate ARDS guidance.");
+        assertThat(guidance.text()).startsWith("Diferir la SBT\n\n• Oxygenation gates weaning.\n• Moderate ARDS guidance.");
         // Bundled citation is split and de-duplicated across both layers, order preserved.
         assertThat(guidance.sources()).containsExactly("Berlin 2012", "Yang & Tobin 1991");
     }
@@ -168,8 +169,9 @@ class ClinicalConsultantServiceTest {
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL),
                 DrivingPressureBand.HIGH);
 
-        assertThat(guidance.text()).contains("Driving pressure exceeds 15 cmH2O.");
-        assertThat(guidance.text()).endsWith("Ref: Amato 2015");
+        assertThat(guidance.text()).startsWith("SBT bajo monitoreo estrecho");
+        assertThat(guidance.text()).contains("• Driving pressure exceeds 15 cmH2O.");
+        assertThat(guidance.text()).endsWith("Fuentes: Amato 2015");
     }
 
     @Test
@@ -185,7 +187,7 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).isEqualTo("insufficient reference data");
+        assertThat(guidance.text()).isEqualTo("Sin datos de referencia suficientes para una recomendación.");
     }
 
     @Test
@@ -201,7 +203,7 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.BORDERLINE, PafiClassification.AT_RISK, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).startsWith("Monitored SBT is reasonable.");
+        assertThat(guidance.text()).startsWith("SBT bajo monitoreo estrecho\n\n• Monitored SBT is reasonable.");
         assertThat(guidance.sources()).containsExactly("AARC 2024");
     }
 }

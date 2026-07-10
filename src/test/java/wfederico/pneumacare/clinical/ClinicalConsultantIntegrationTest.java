@@ -99,6 +99,6 @@ class ClinicalConsultantIntegrationTest {
 
         ConsultantGuidance guidance = service.compose(result);
 
-        assertThat(guidance.text()).isEqualTo("insufficient reference data");
+        assertThat(guidance.text()).isEqualTo("Sin datos de referencia suficientes para una recomendación.");
     }
 }

@@ -1,43 +1,49 @@
 -- =============================================================================
 -- V23__enrich_reference_and_add_combination_rules.sql
--- PneumaCare - Evidence-grounded upgrade of the clinical consultant.
+-- PneumaCare - Evidence-grounded, Spanish, bedside-readable clinical consultant.
 --
--- Two changes, both non-PII and reference-only:
---   1. Enrich the existing single-metric PaFi rows with the Berlin-cohort
---      hospital-mortality figures (mild 27% / moderate 32% / severe 45%),
---      reported in the same Berlin Definition paper already cited.
---   2. Add a cross-metric knowledge base (clinical_combination_rule): guidance
---      that only applies when *several* indices co-occur (e.g. a favorable RSBI
---      but ARDS-range oxygenation), which single-metric rows cannot express.
+-- Three changes, all non-PII and reference-only:
+--   1. Rewrite the single-metric guidance in concise, action-first Spanish so it
+--      is fast to scan during a weaning decision.
+--   2. Add Berlin-cohort hospital-mortality context to the PaFi/ARDS bands.
+--   3. Add a cross-metric knowledge base (clinical_combination_rule): guidance
+--      that only applies when several indices co-occur (e.g. a favorable RSBI but
+--      ARDS-range oxygenation), which single-metric rows cannot express.
 --
--- The consultant composes combination guidance first (whole-patient synthesis),
--- then falls back to the single-metric rows. Concern-only, safe-default when
--- nothing matches. No hosted or trained model — deterministic and fully citeable.
+-- The consultant renders a weaning verdict headline, then the matched findings as
+-- prioritized bullets, then a muted sources line. Deterministic and fully
+-- citeable — no hosted or trained model.
 -- =============================================================================
 
--- 1. Enrich existing PaFi guidance with Berlin-cohort mortality context. ------
---    Source paper unchanged; it reported these mortality rates by severity.
+-- 1. Rewrite single-metric guidance in Spanish (with ARDS mortality context). --
 
-UPDATE medical_reference
-SET guidance_text = 'A PaO2/FiO2 ratio below 100 mmHg meets the Berlin criteria for severe ARDS '
-        || '(Berlin-cohort hospital mortality ~45%); prioritize lung-protective ventilation and '
-        || 'consider prone positioning and specialist review before any weaning attempt.',
-    updated_at = now()
-WHERE metric = 'PAFI' AND band = 'SEVERE_ARDS';
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'PaFi <100 (SDRA grave, mortalidad ~45%): ventilación protectora, considerar prono y consulta con especialista antes de destetar.'
+    WHERE metric = 'PAFI' AND band = 'SEVERE_ARDS';
 
-UPDATE medical_reference
-SET guidance_text = 'A PaO2/FiO2 ratio of 100-200 mmHg indicates moderate ARDS '
-        || '(Berlin-cohort hospital mortality ~32%); maintain lung-protective settings, optimize PEEP, '
-        || 'and defer spontaneous breathing trials until oxygenation improves.',
-    updated_at = now()
-WHERE metric = 'PAFI' AND band = 'MODERATE_ARDS';
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'PaFi 100-200 (SDRA moderado, mortalidad ~32%): ventilación protectora, optimizar PEEP y diferir la SBT.'
+    WHERE metric = 'PAFI' AND band = 'MODERATE_ARDS';
 
-UPDATE medical_reference
-SET guidance_text = 'A PaO2/FiO2 ratio of 200-300 mmHg indicates mild ARDS '
-        || '(Berlin-cohort hospital mortality ~27%); continue protective ventilation and reassess the '
-        || 'oxygenation trend before escalating weaning.',
-    updated_at = now()
-WHERE metric = 'PAFI' AND band = 'MILD_ARDS';
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'PaFi 200-300 (SDRA leve, mortalidad ~27%): mantener ventilación protectora y vigilar la tendencia de oxigenación.'
+    WHERE metric = 'PAFI' AND band = 'MILD_ARDS';
+
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'PaFi 300-400: por debajo de lo normal; vigilar la oxigenación antes de destetar.'
+    WHERE metric = 'PAFI' AND band = 'AT_RISK';
+
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'RSBI >105: alta probabilidad de fracaso del destete. Diferir la SBT; reevaluar drive, carga y sedación.'
+    WHERE metric = 'RSBI' AND band = 'UNFAVORABLE';
+
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'RSBI 80-105: tolerancia al destete limítrofe; SBT bajo monitoreo estrecho, lista para suspender ante fatiga.'
+    WHERE metric = 'RSBI' AND band = 'BORDERLINE';
+
+UPDATE medical_reference SET updated_at = now(), guidance_text =
+    'Compliance <50 mL/cmH2O: descartar atelectasia, edema o sobredistensión; reevaluar PEEP y Vt.'
+    WHERE metric = 'CSTAT' AND band = 'LOW';
 
 -- 2. Cross-metric knowledge base. --------------------------------------------
 --    Each *_band column is a wildcard when NULL, otherwise a comma-separated
@@ -71,34 +77,25 @@ INSERT INTO clinical_combination_rule
     (rule_name, rsbi_band, pafi_band, cstat_band, dp_band, guidance_text, source_ref, priority)
 VALUES
     ('severe-ards-stiff-lung', NULL, 'SEVERE_ARDS', 'LOW', NULL,
-     'Severe hypoxemia together with low static compliance is a typical severe-ARDS mechanical profile '
-       || '(Berlin-cohort hospital mortality ~45%); maintain lung-protective ventilation, consider prone '
-       || 'positioning, and obtain specialist review before any weaning attempt.',
+     'SDRA grave con compliance baja (mortalidad ~45%): ventilación protectora, considerar prono y consulta con especialista antes de destetar.',
      'ARDS Definition Task Force (Berlin), JAMA 2012;307:2526-33', 210),
 
     ('high-driving-pressure', NULL, NULL, NULL, 'HIGH',
-     'Driving pressure exceeds 15 cmH2O — the ventilator parameter most strongly associated with mortality '
-       || 'in ARDS; reduce tidal volume and/or optimize PEEP to lower driving pressure toward a lung-protective target.',
+     'Presión de conducción >15 cmH2O: bajar Vt y/u optimizar PEEP (principal predictor de mortalidad en SDRA).',
      'Amato et al., N Engl J Med 2015;372:747-55', 205),
 
     ('oxygenation-gates-weaning', 'FAVORABLE', 'MODERATE_ARDS,SEVERE_ARDS', NULL, NULL,
-     'Although the RSBI is favorable, oxygenation meets ARDS criteria; oxygenation — not respiratory drive — '
-       || 'is the limiting factor, so defer the spontaneous breathing trial and prioritize lung-protective ventilation.',
+     'RSBI favorable pero PaFi en rango de SDRA: la oxigenación limita el destete. Diferir la SBT y priorizar ventilación protectora.',
      'ARDS Definition Task Force (Berlin), JAMA 2012;307:2526-33; Yang & Tobin, N Engl J Med 1991;324:1445-50', 200),
 
     ('high-load-stiff-lung', 'UNFAVORABLE', NULL, 'LOW', NULL,
-     'A high RSBI together with reduced static compliance points to a combined high respiratory load and stiff '
-       || 'lung; defer the spontaneous breathing trial and evaluate for atelectasis, edema, or over-distension '
-       || 'while optimizing PEEP and tidal volume.',
+     'RSBI alto + compliance baja (carga alta, pulmón rígido): diferir la SBT; descartar atelectasia/edema y optimizar PEEP y Vt.',
      'Yang & Tobin, N Engl J Med 1991;324:1445-50; Grinnan & Truwit, Crit Care 2005;9:472-84', 180),
 
     ('weaning-readiness', 'FAVORABLE', 'NORMAL,AT_RISK', 'NORMAL,HIGH', NULL,
-     'RSBI, oxygenation, and compliance are jointly consistent with weaning readiness; a protocolized '
-       || 'spontaneous breathing trial (pressure support <=8 cmH2O, 30-120 min) may be considered per unit '
-       || 'protocol, terminating on SpO2 <90%, tachypnea, or hemodynamic instability.',
+     'RSBI, oxigenación y compliance compatibles con destete: considerar SBT protocolizada (PS <=8 cmH2O, 30-120 min); suspender si SpO2 <90%, taquipnea o inestabilidad.',
      'Burns et al., AARC Clinical Practice Guideline 2024; Yang & Tobin, N Engl J Med 1991;324:1445-50', 150),
 
     ('borderline-rsbi-acceptable-oxygenation', 'BORDERLINE', 'NORMAL,AT_RISK,MILD_ARDS', NULL, NULL,
-     'A borderline RSBI with acceptable oxygenation supports a closely monitored spontaneous breathing trial; '
-       || 'be prepared to abort on tachypnea, desaturation, or hemodynamic instability.',
+     'RSBI borderline con oxigenación aceptable: SBT bajo monitoreo estrecho; suspender ante taquipnea, desaturación o inestabilidad.',
      'Yang & Tobin, N Engl J Med 1991;324:1445-50; Burns et al., AARC Clinical Practice Guideline 2024', 120);
