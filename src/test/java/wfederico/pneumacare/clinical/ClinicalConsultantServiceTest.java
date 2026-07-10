@@ -9,15 +9,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import wfederico.pneumacare.clinical.application.ClinicalConsultantService;
 import wfederico.pneumacare.clinical.domain.ConsultantGuidance;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.CstatResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.PafiResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.RsbiResult;
+import wfederico.pneumacare.clinical.infrastructure.persistence.ClinicalCombinationRuleJpaEntity;
+import wfederico.pneumacare.clinical.infrastructure.persistence.ClinicalCombinationRuleRepository;
 import wfederico.pneumacare.clinical.infrastructure.persistence.MedicalReferenceJpaEntity;
 import wfederico.pneumacare.clinical.infrastructure.persistence.MedicalReferenceRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +34,9 @@ class ClinicalConsultantServiceTest {
     @Mock
     private MedicalReferenceRepository referenceRepository;
 
+    @Mock
+    private ClinicalCombinationRuleRepository combinationRuleRepository;
+
     @InjectMocks
     private ClinicalConsultantService service;
 
@@ -37,6 +44,15 @@ class ClinicalConsultantServiceTest {
         return MedicalReferenceJpaEntity.builder()
                 .metric(metric).band(band)
                 .rangeDescriptor("range").context("ctx")
+                .guidanceText(text).sourceRef(source).priority(priority)
+                .build();
+    }
+
+    private ClinicalCombinationRuleJpaEntity rule(String name, String rsbi, String pafi, String cstat,
+                                                  String dp, String text, String source, int priority) {
+        return ClinicalCombinationRuleJpaEntity.builder()
+                .ruleName(name)
+                .rsbiBand(rsbi).pafiBand(pafi).cstatBand(cstat).dpBand(dp)
                 .guidanceText(text).sourceRef(source).priority(priority)
                 .build();
     }
@@ -60,8 +76,9 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.UNFAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).contains("RSBI above 105 predicts weaning failure.");
-        assertThat(guidance.text()).contains("Ref: Yang & Tobin 1991");
+        assertThat(guidance.text()).startsWith("Diferir la SBT");
+        assertThat(guidance.text()).contains("• RSBI above 105 predicts weaning failure.");
+        assertThat(guidance.text()).contains("Fuentes: Yang & Tobin 1991");
         assertThat(guidance.sources()).containsExactly("Yang & Tobin 1991");
         verifyNoMoreInteractions(referenceRepository);
     }
@@ -76,7 +93,7 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
 
-        assertThat(guidance.text()).isEqualTo("insufficient reference data");
+        assertThat(guidance.text()).isEqualTo("Sin datos de referencia suficientes para una recomendación.");
         assertThat(guidance.sources()).isEmpty();
     }
 
@@ -93,8 +110,8 @@ class ClinicalConsultantServiceTest {
         ConsultantGuidance guidance = service.compose(
                 result(RsbiInterpretation.UNFAVORABLE, PafiClassification.SEVERE_ARDS, CstatInterpretation.LOW));
 
-        // Highest priority (PaFi 100) first, then RSBI 70, then Cstat 50.
-        assertThat(guidance.text()).startsWith("PaFi sentence. RSBI sentence. Cstat sentence.");
+        // Verdict headline, then highest priority (PaFi 100) first, then RSBI 70, then Cstat 50.
+        assertThat(guidance.text()).startsWith("Diferir la SBT\n\n• PaFi sentence.\n• RSBI sentence.\n• Cstat sentence.");
         assertThat(guidance.text().indexOf("PaFi sentence."))
                 .isLessThan(guidance.text().indexOf("RSBI sentence."));
         assertThat(guidance.text().indexOf("RSBI sentence."))
@@ -116,6 +133,77 @@ class ClinicalConsultantServiceTest {
                 result(RsbiInterpretation.FAVORABLE, PafiClassification.MODERATE_ARDS, CstatInterpretation.LOW));
 
         assertThat(guidance.sources()).containsExactly("Berlin 2012");
-        assertThat(guidance.text()).endsWith("Ref: Berlin 2012");
+        assertThat(guidance.text()).endsWith("Fuentes: Berlin 2012");
+    }
+
+    @Test
+    @DisplayName("a matching cross-metric rule composes before the single-metric guidance")
+    void combinationRuleComposesFirst() {
+        when(combinationRuleRepository.findAll()).thenReturn(List.of(
+                rule("oxygenation-gates-weaning", "FAVORABLE", "MODERATE_ARDS,SEVERE_ARDS", null, null,
+                        "Oxygenation gates weaning.", "Berlin 2012; Yang & Tobin 1991", 200)));
+        when(referenceRepository.findByMetricAndBand("RSBI", "FAVORABLE")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("PAFI", "MODERATE_ARDS"))
+                .thenReturn(Optional.of(ref("PAFI", "MODERATE_ARDS", "Moderate ARDS guidance.", "Berlin 2012", 80)));
+        when(referenceRepository.findByMetricAndBand("CSTAT", "NORMAL")).thenReturn(Optional.empty());
+
+        ConsultantGuidance guidance = service.compose(
+                result(RsbiInterpretation.FAVORABLE, PafiClassification.MODERATE_ARDS, CstatInterpretation.NORMAL));
+
+        assertThat(guidance.text()).startsWith("Diferir la SBT\n\n• Oxygenation gates weaning.\n• Moderate ARDS guidance.");
+        // Bundled citation is split and de-duplicated across both layers, order preserved.
+        assertThat(guidance.sources()).containsExactly("Berlin 2012", "Yang & Tobin 1991");
+    }
+
+    @Test
+    @DisplayName("a driving-pressure rule fires only when the HIGH band is supplied")
+    void drivingPressureRuleFiresOnHighBand() {
+        when(combinationRuleRepository.findAll()).thenReturn(List.of(
+                rule("high-driving-pressure", null, null, null, "HIGH",
+                        "Driving pressure exceeds 15 cmH2O.", "Amato 2015", 205)));
+        when(referenceRepository.findByMetricAndBand("RSBI", "FAVORABLE")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("PAFI", "NORMAL")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("CSTAT", "NORMAL")).thenReturn(Optional.empty());
+
+        ConsultantGuidance guidance = service.compose(
+                result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL),
+                DrivingPressureBand.HIGH);
+
+        assertThat(guidance.text()).startsWith("SBT bajo monitoreo estrecho");
+        assertThat(guidance.text()).contains("• Driving pressure exceeds 15 cmH2O.");
+        assertThat(guidance.text()).endsWith("Fuentes: Amato 2015");
+    }
+
+    @Test
+    @DisplayName("a driving-pressure rule does not fire when no driving-pressure band is available")
+    void drivingPressureRuleSkippedWhenBandMissing() {
+        when(combinationRuleRepository.findAll()).thenReturn(List.of(
+                rule("high-driving-pressure", null, null, null, "HIGH",
+                        "Driving pressure exceeds 15 cmH2O.", "Amato 2015", 205)));
+        when(referenceRepository.findByMetricAndBand("RSBI", "FAVORABLE")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("PAFI", "NORMAL")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("CSTAT", "NORMAL")).thenReturn(Optional.empty());
+
+        ConsultantGuidance guidance = service.compose(
+                result(RsbiInterpretation.FAVORABLE, PafiClassification.NORMAL, CstatInterpretation.NORMAL));
+
+        assertThat(guidance.text()).isEqualTo("Sin datos de referencia suficientes para una recomendación.");
+    }
+
+    @Test
+    @DisplayName("a comma-separated band allow-list matches any listed band")
+    void commaSeparatedBandAllowListMatches() {
+        when(combinationRuleRepository.findAll()).thenReturn(List.of(
+                rule("borderline-rsbi-acceptable-oxygenation", "BORDERLINE", "NORMAL,AT_RISK,MILD_ARDS", null, null,
+                        "Monitored SBT is reasonable.", "AARC 2024", 120)));
+        when(referenceRepository.findByMetricAndBand("RSBI", "BORDERLINE")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("PAFI", "AT_RISK")).thenReturn(Optional.empty());
+        when(referenceRepository.findByMetricAndBand("CSTAT", "NORMAL")).thenReturn(Optional.empty());
+
+        ConsultantGuidance guidance = service.compose(
+                result(RsbiInterpretation.BORDERLINE, PafiClassification.AT_RISK, CstatInterpretation.NORMAL));
+
+        assertThat(guidance.text()).startsWith("SBT bajo monitoreo estrecho\n\n• Monitored SBT is reasonable.");
+        assertThat(guidance.sources()).containsExactly("AARC 2024");
     }
 }

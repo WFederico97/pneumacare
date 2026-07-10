@@ -41,6 +41,8 @@ public class ClinicalConsultantInsightJpaEntity extends EntityBase {
     @Column(name = "evaluation_id", nullable = false, unique = true)
     private UUID evaluationId;
 
-    @Column(name = "insight_text", nullable = false)
+    // columnDefinition = text so Hibernate's dev ddl matches the V20 TEXT column;
+    // cross-metric guidance routinely exceeds the default varchar(255).
+    @Column(name = "insight_text", nullable = false, columnDefinition = "text")
     private String insightText;
 }
