@@ -37,7 +37,7 @@ class DemoScenariosTest {
         assertBands(2, RsbiInterpretation.FAVORABLE,   PafiClassification.NORMAL,      CstatInterpretation.NORMAL);
         assertBands(3, RsbiInterpretation.FAVORABLE,   PafiClassification.AT_RISK,     CstatInterpretation.LOW);
         assertBands(4, RsbiInterpretation.FAVORABLE,   PafiClassification.MODERATE_ARDS, CstatInterpretation.NORMAL);
-        assertBands(5, RsbiInterpretation.FAVORABLE,   PafiClassification.NORMAL,      CstatInterpretation.HIGH);
+        assertBands(5, RsbiInterpretation.FAVORABLE,   PafiClassification.AT_RISK,     CstatInterpretation.NORMAL);
     }
 
     private void assertBands(int patientIndex, RsbiInterpretation rsbi,

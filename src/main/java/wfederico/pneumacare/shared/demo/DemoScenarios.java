@@ -45,10 +45,11 @@ public final class DemoScenarios {
                 new Reading(-2, 24, 460, 130, 1.00, 17, 8),
                 new Reading(-1, 22, 480, 140, 1.00, 17, 8),
                 new Reading( 0, 20, 500, 150, 1.00, 18, 8))),
+            // P6 — isolated oxygenation risk, improving: FAVORABLE / AT_RISK / NORMAL → monitor.
             new Patient("Elena", "Morales", LocalDate.of(1975, 5, 30), List.of(
-                new Reading(-2, 20, 520, 220, 0.50, 13, 6),
-                new Reading(-1, 18, 540, 210, 0.45, 12, 6),
-                new Reading( 0, 16, 550, 200, 0.40, 12, 7)))
+                new Reading(-2, 22, 500, 260, 1.00, 20, 8),
+                new Reading(-1, 18, 530, 300, 1.00, 18, 8),
+                new Reading( 0, 16, 550, 350, 1.00, 17, 7)))
         );
     }
 }
