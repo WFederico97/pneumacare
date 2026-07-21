@@ -11,10 +11,18 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
+import wfederico.pneumacare.clinical.domain.MetricBreach;
+import wfederico.pneumacare.clinical.domain.RiskThresholdEvaluator;
+import wfederico.pneumacare.clinical.domain.VentilatorBrand;
+import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
+import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityRepository;
 import wfederico.pneumacare.shared.security.bootstrap.BootstrapAdminProperties;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,9 +51,12 @@ public class DemoDataSeeder implements ApplicationRunner {
     static final String DEMO_ICU_ID = "eeeeeeee-0000-0000-0000-000000000001";
     static final String DEMO_ICU_CODE = "DEMO-ICU";
 
+    private static final int SNAPSHOT_SCALE = 2;
+
     private final JdbcClient jdbcClient;
     private final BootstrapAdminProperties adminProperties;
     private final PatientIdentityRepository patientIdentityRepository;
+    private final VentilatorFactory ventilatorFactory;
 
     /** Ids created during seeding, threaded between steps. */
     private record DemoContext(UUID shiftId, UUID ventilatorId, UUID adminUserId, List<UUID> bedIds) {}
@@ -145,8 +156,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         List<DemoScenarios.Patient> patients = DemoScenarios.patients();
         for (int i = 0; i < patients.size(); i++) {
             UUID patientId = seedPatient(patients.get(i), icuId, ctx.bedIds().get(i));
-            // Evaluations added in Task 6:
-            // seedEvaluations(patients.get(i), patientId, ctx);
+            seedEvaluations(patients.get(i), patientId, ctx);
         }
     }
 
@@ -178,5 +188,54 @@ public class DemoDataSeeder implements ApplicationRunner {
                 .param("admitted", OffsetDateTime.now().minusDays(3))
                 .update();
         return patientId;
+    }
+
+    private void seedEvaluations(DemoScenarios.Patient p, UUID patientId, DemoContext ctx) {
+        OffsetDateTime seedNow = OffsetDateTime.now();
+        for (DemoScenarios.Reading r : p.readings()) {
+            VentilatorReading reading = new VentilatorReading(
+                    r.f(), r.vt(), r.pao2(), r.fio2(), r.pplat(), r.peep());
+            VentilatorEvaluationResult result =
+                    ventilatorFactory.resolve(VentilatorBrand.TECME).evaluate(reading);
+
+            List<MetricBreach> breaches = RiskThresholdEvaluator.evaluate(
+                    result.rsbi().value(), result.pafi().value(), result.cstat().value());
+
+            jdbcClient.sql("""
+                    INSERT INTO evaluations
+                        (id, patient_id, shift_id, physical_ventilator_id, evaluation_time,
+                         f, vt, pao2, fio2, pplat, peep,
+                         rsbi_snapshot, pafi_snapshot, cstat_snapshot,
+                         rsbi_interpretation, pafi_classification, cstat_interpretation,
+                         alert_triggered, created_by)
+                    VALUES
+                        (:id, :patient, :shift, :vent, :time,
+                         :f, :vt, :pao2, :fio2, :pplat, :peep,
+                         :rsbi, :pafi, :cstat,
+                         :rsbiI, :pafiI, :cstatI,
+                         :alert, :createdBy)
+                    """)
+                    .param("id", UUID.randomUUID())
+                    .param("patient", patientId)
+                    .param("shift", ctx.shiftId())
+                    .param("vent", ctx.ventilatorId())
+                    .param("time", seedNow.plusDays(r.dayOffset()))
+                    .param("f", bd(r.f())).param("vt", bd(r.vt()))
+                    .param("pao2", bd(r.pao2())).param("fio2", bd(r.fio2()))
+                    .param("pplat", bd(r.pplat())).param("peep", bd(r.peep()))
+                    .param("rsbi", bd(result.rsbi().value()))
+                    .param("pafi", bd(result.pafi().value()))
+                    .param("cstat", bd(result.cstat().value()))
+                    .param("rsbiI", result.rsbi().interpretation().name())
+                    .param("pafiI", result.pafi().classification().name())
+                    .param("cstatI", result.cstat().interpretation().name())
+                    .param("alert", !breaches.isEmpty())
+                    .param("createdBy", ctx.adminUserId())
+                    .update();
+        }
+    }
+
+    private static BigDecimal bd(double v) {
+        return BigDecimal.valueOf(v).setScale(SNAPSHOT_SCALE, RoundingMode.HALF_UP);
     }
 }

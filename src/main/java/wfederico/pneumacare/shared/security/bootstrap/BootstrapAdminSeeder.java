@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import wfederico.pneumacare.shared.security.user.Role;
@@ -23,6 +25,7 @@ import java.util.EnumSet;
  * missing, rather than seeding an unusable account.
  */
 @Component
+@Order(Ordered.LOWEST_PRECEDENCE - 10)
 @ConditionalOnProperty(prefix = "app.security.bootstrap-admin", name = "enabled", havingValue = "true")
 public class BootstrapAdminSeeder implements ApplicationRunner {
 
