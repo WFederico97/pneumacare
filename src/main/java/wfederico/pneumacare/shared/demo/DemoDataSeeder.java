@@ -11,6 +11,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityRepository;
 import wfederico.pneumacare.shared.security.bootstrap.BootstrapAdminProperties;
 
 import java.time.OffsetDateTime;
@@ -43,6 +45,7 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private final JdbcClient jdbcClient;
     private final BootstrapAdminProperties adminProperties;
+    private final PatientIdentityRepository patientIdentityRepository;
 
     /** Ids created during seeding, threaded between steps. */
     private record DemoContext(UUID shiftId, UUID ventilatorId, UUID adminUserId, List<UUID> bedIds) {}
@@ -56,8 +59,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
         log.info("Seeding demo dataset (Demo ICU + 6 patients)...");
         DemoContext ctx = seedInfrastructure();
-        // Patients + evaluations added in Tasks 5–6:
-        // seedPatientsAndEvaluations(ctx);
+        seedPatientsAndEvaluations(ctx);
         log.info("Demo dataset seeded.");
     }
 
@@ -136,5 +138,45 @@ public class DemoDataSeeder implements ApplicationRunner {
                 .param("start", OffsetDateTime.now().minusDays(3)).update();
 
         return new DemoContext(shiftId, ventilatorId, adminUserId, bedIds);
+    }
+
+    private void seedPatientsAndEvaluations(DemoContext ctx) {
+        UUID icuId = UUID.fromString(DEMO_ICU_ID);
+        List<DemoScenarios.Patient> patients = DemoScenarios.patients();
+        for (int i = 0; i < patients.size(); i++) {
+            UUID patientId = seedPatient(patients.get(i), icuId, ctx.bedIds().get(i));
+            // Evaluations added in Task 6:
+            // seedEvaluations(patients.get(i), patientId, ctx);
+        }
+    }
+
+    /**
+     * Creates the encrypted PII identity via JPA (so AesAttributeConverter runs),
+     * then the operational patient row via JDBC, assigned to the given bed.
+     *
+     * @return the new patients.id
+     */
+    private UUID seedPatient(DemoScenarios.Patient p, UUID icuId, UUID bedId) {
+        PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
+                .firstName(p.firstName())
+                .lastName(p.lastName())
+                .birthDate(p.birthDate())
+                .build();
+        UUID identityId = patientIdentityRepository.saveAndFlush(identity).getId();
+
+        UUID patientId = UUID.randomUUID();
+        jdbcClient.sql("""
+                INSERT INTO patients
+                    (id, icu_id, identity_id, bed_id, clinical_status, respiratory_status, admission_date)
+                VALUES
+                    (:id, :icu, :identity, :bed, 'ADMITTED', 'INTUBATED', :admitted)
+                """)
+                .param("id", patientId)
+                .param("icu", icuId)
+                .param("identity", identityId)
+                .param("bed", bedId)
+                .param("admitted", OffsetDateTime.now().minusDays(3))
+                .update();
+        return patientId;
     }
 }
