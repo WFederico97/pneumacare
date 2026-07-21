@@ -13,7 +13,6 @@ import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftJpaEntity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftRepository;
-import wfederico.pneumacare.shift.web.dto.CreateShiftRequest;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.time.OffsetDateTime;
@@ -52,7 +51,12 @@ public class MedicalShiftService {
     }
 
     /**
-     * Opens a new shift for an ICU.
+     * Opens a new shift for the current session's ICU.
+     *
+     * <p>The ICU is derived server-side from the authenticated principal via
+     * {@link CurrentIcuPort} — the same source {@link #getActiveShift()} reads —
+     * so open and active-lookup are always scoped to the same ICU. The client
+     * does not supply it.
      *
      * <p>{@link Observed} records a {@code shift.open} timer/span; only the ICU UUID
      * (non-PII) is added as a span attribute.
@@ -60,8 +64,8 @@ public class MedicalShiftService {
     @Observed(name = "shift.open", contextualName = "open-shift",
             lowCardinalityKeyValues = {"endpoint", "shift-open"})
     @Transactional
-    public ShiftResponse open(CreateShiftRequest shiftRequest){
-        UUID icuId = shiftRequest.icuId();
+    public ShiftResponse open(){
+        UUID icuId = currentIcuPort.currentIcuId();
         Span.current().setAttribute("shift.icu_id", String.valueOf(icuId));
 
         if (!icuExistencePort.exists(icuId)){

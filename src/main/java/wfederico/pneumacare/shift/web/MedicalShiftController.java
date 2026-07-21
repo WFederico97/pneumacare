@@ -3,7 +3,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -15,7 +14,6 @@ import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
-import wfederico.pneumacare.shift.web.dto.CreateShiftRequest;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.net.URI;
@@ -63,17 +61,17 @@ public class MedicalShiftController {
 
     @Operation(
             summary = "Open a medical shift",
-            description = "Opens a new OPEN shift for the given ICU. At most one OPEN shift may exist per ICU.")
+            description = "Opens a new OPEN shift for the caller's ICU (derived from the session). "
+                    + "At most one OPEN shift may exist per ICU.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Shift opened; Location header points to the new resource."),
-            @ApiResponse(responseCode = "400", description = "Missing or malformed icuId."),
             @ApiResponse(responseCode = "409", description = "The ICU already has an OPEN shift."),
             @ApiResponse(responseCode = "422", description = "The referenced ICU does not exist.")
     })
     @PreAuthorize("hasRole('CHIEF_OF_GUARD')")
     @PostMapping
-    public ResponseEntity<ApiResponseBase<ShiftResponse>> openShift(@Valid @RequestBody CreateShiftRequest request){
-        ShiftResponse data = service.open(request);
+    public ResponseEntity<ApiResponseBase<ShiftResponse>> openShift(){
+        ShiftResponse data = service.open();
 
         URI location = URI.create("/api/v1/shifts/" + data.id());
         return ResponseEntity

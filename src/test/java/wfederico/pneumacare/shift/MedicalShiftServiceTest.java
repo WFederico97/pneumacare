@@ -16,7 +16,6 @@ import wfederico.pneumacare.shift.application.MedicalShiftService;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftJpaEntity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftRepository;
-import wfederico.pneumacare.shift.web.dto.CreateShiftRequest;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.time.OffsetDateTime;
@@ -53,6 +52,7 @@ class MedicalShiftServiceTest {
     @Test
     @DisplayName("open_validRequest_returnsOpenShift (AC1)")
     void open_validRequest_returnsOpenShift() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
         when(icuExistencePort.exists(ICU_ID)).thenReturn(true);
         when(shiftRepository.existsByIcuIdAndStatus(ICU_ID, ShiftStatus.OPEN)).thenReturn(false);
         when(currentUserPort.currentUserId()).thenReturn(CHIEF_ID);
@@ -66,7 +66,7 @@ class MedicalShiftServiceTest {
                 .build();
         when(shiftRepository.save(any(MedicalShiftJpaEntity.class))).thenReturn(saved);
 
-        ShiftResponse response = service.open(new CreateShiftRequest(ICU_ID));
+        ShiftResponse response = service.open();
 
         assertThat(response.id()).isEqualTo(SHIFT_ID);
         assertThat(response.icuId()).isEqualTo(ICU_ID);
@@ -79,10 +79,11 @@ class MedicalShiftServiceTest {
     @Test
     @DisplayName("open_duplicateOpenForIcu_throws409 (AC2)")
     void open_duplicateOpenForIcu_throws409() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
         when(icuExistencePort.exists(ICU_ID)).thenReturn(true);
         when(shiftRepository.existsByIcuIdAndStatus(ICU_ID, ShiftStatus.OPEN)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.open(new CreateShiftRequest(ICU_ID)))
+        assertThatThrownBy(() -> service.open())
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.CONFLICT));
@@ -93,9 +94,10 @@ class MedicalShiftServiceTest {
     @Test
     @DisplayName("open_unknownIcu_throws422 (AC3)")
     void open_unknownIcu_throws422() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
         when(icuExistencePort.exists(ICU_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.open(new CreateShiftRequest(ICU_ID)))
+        assertThatThrownBy(() -> service.open())
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT));
@@ -106,13 +108,14 @@ class MedicalShiftServiceTest {
     @Test
     @DisplayName("open_concurrentRaceHitsUniqueIndex_throws409 (AC2 concurrency)")
     void open_concurrentRace_throws409() {
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
         when(icuExistencePort.exists(ICU_ID)).thenReturn(true);
         when(shiftRepository.existsByIcuIdAndStatus(ICU_ID, ShiftStatus.OPEN)).thenReturn(false);
         when(currentUserPort.currentUserId()).thenReturn(CHIEF_ID);
         when(shiftRepository.save(any(MedicalShiftJpaEntity.class)))
                 .thenThrow(new DataIntegrityViolationException("unique index"));
 
-        assertThatThrownBy(() -> service.open(new CreateShiftRequest(ICU_ID)))
+        assertThatThrownBy(() -> service.open())
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.CONFLICT));
