@@ -125,6 +125,9 @@ app:
   # Set via AES_SECRET_KEY environment variable.
   # Generate a key with: openssl rand -base64 32
   security:
+    # ICU the self-issued JWT scopes the session to (bed grid, etc.). Defaults to
+    # the V26-seeded ICU; override with DEFAULT_ICU_ID (e.g. the Demo ICU).
+    default-icu-id: ${DEFAULT_ICU_ID:cccccccc-0000-0000-0000-000000000001}
     encryption:
       aes-secret-key: ${AES_SECRET_KEY:}
     # Self-issued JWT (HS256). secret must be >= 256-bit (32 bytes); supply via
