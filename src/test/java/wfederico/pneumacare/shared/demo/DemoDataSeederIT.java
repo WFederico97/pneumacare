@@ -70,6 +70,23 @@ class DemoDataSeederIT {
                 """).query(Integer.class).single();
         assertThat(strayBeds).isZero();
 
+        // Every demo patient has exactly one identifier (DNI) — the UI requires it.
+        Integer identifiers = jdbcClient.sql("""
+                SELECT count(*) FROM patient_identifiers pid
+                JOIN patients p ON p.identity_id = pid.patient_identity_id
+                JOIN intensive_care_units i ON i.id = p.icu_id
+                WHERE i.code = 'DEMO-ICU'
+                """).query(Integer.class).single();
+        assertThat(identifiers).isEqualTo(6);
+
+        // One OPEN shift exists in the Demo ICU.
+        Integer openShifts = jdbcClient.sql("""
+                SELECT count(*) FROM medical_shifts s
+                JOIN intensive_care_units i ON i.id = s.icu_id
+                WHERE i.code = 'DEMO-ICU' AND s.status = 'OPEN'
+                """).query(Integer.class).single();
+        assertThat(openShifts).isEqualTo(1);
+
         // Running again must be a no-op (idempotency guard).
         seeder.run(null);
         Integer patientsAfter = jdbcClient.sql("""

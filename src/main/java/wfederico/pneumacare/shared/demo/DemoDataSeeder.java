@@ -17,6 +17,9 @@ import wfederico.pneumacare.clinical.domain.RiskThresholdEvaluator;
 import wfederico.pneumacare.clinical.domain.VentilatorBrand;
 import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifierJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifierTypeJpaEntity;
+import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentifierTypeRepository;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientIdentityRepository;
 import wfederico.pneumacare.shared.security.bootstrap.BootstrapAdminProperties;
@@ -56,6 +59,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final JdbcClient jdbcClient;
     private final BootstrapAdminProperties adminProperties;
     private final PatientIdentityRepository patientIdentityRepository;
+    private final PatientIdentifierTypeRepository identifierTypeRepository;
     private final VentilatorFactory ventilatorFactory;
 
     /** Ids created during seeding, threaded between steps. */
@@ -154,25 +158,45 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private void seedPatientsAndEvaluations(DemoContext ctx) {
         UUID icuId = UUID.fromString(DEMO_ICU_ID);
+        PatientIdentifierTypeJpaEntity dniType = resolveDniType();
         List<DemoScenarios.Patient> patients = DemoScenarios.patients();
         for (int i = 0; i < patients.size(); i++) {
-            UUID patientId = seedPatient(patients.get(i), icuId, ctx.bedIds().get(i));
+            UUID patientId = seedPatient(patients.get(i), icuId, ctx.bedIds().get(i), dniType, i);
             seedEvaluations(patients.get(i), patientId, ctx);
         }
     }
 
+    /** Loads the DNI identifier type (seeded by Flyway V4) as a managed entity. */
+    private PatientIdentifierTypeJpaEntity resolveDniType() {
+        Integer dniTypeId = jdbcClient.sql(
+                "SELECT patient_identifier_type_id FROM patient_identifier_types WHERE patient_identifier_type_name = 'DNI'")
+                .query(Integer.class)
+                .single();
+        return identifierTypeRepository.findById(dniTypeId)
+                .orElseThrow(() -> new IllegalStateException("DNI identifier type not seeded (Flyway V4)."));
+    }
+
     /**
-     * Creates the encrypted PII identity via JPA (so AesAttributeConverter runs),
-     * then the operational patient row via JDBC, assigned to the given bed.
+     * Creates the encrypted PII identity (name + one DNI identifier) via JPA so
+     * AesAttributeConverter runs, then the operational patient row via JDBC,
+     * assigned to the given bed. Real admissions always carry an identifier, so
+     * seeding one keeps the demo data consistent with what the UI expects.
      *
      * @return the new patients.id
      */
-    private UUID seedPatient(DemoScenarios.Patient p, UUID icuId, UUID bedId) {
+    private UUID seedPatient(DemoScenarios.Patient p, UUID icuId, UUID bedId,
+                             PatientIdentifierTypeJpaEntity dniType, int index) {
         PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
                 .firstName(p.firstName())
                 .lastName(p.lastName())
                 .birthDate(p.birthDate())
                 .build();
+        PatientIdentifierJpaEntity dni = PatientIdentifierJpaEntity.builder()
+                .patientIdentifierName(String.format("%08d", 30_000_000 + index * 1_111_111))
+                .patientIdentity(identity)
+                .patientIdentifierType(dniType)
+                .build();
+        identity.addIdentifier(dni);
         UUID identityId = patientIdentityRepository.saveAndFlush(identity).getId();
 
         UUID patientId = UUID.randomUUID();

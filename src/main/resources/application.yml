@@ -128,6 +128,10 @@ app:
     # ICU the self-issued JWT scopes the session to (bed grid, etc.). Defaults to
     # the V26-seeded ICU; override with DEFAULT_ICU_ID (e.g. the Demo ICU).
     default-icu-id: ${DEFAULT_ICU_ID:cccccccc-0000-0000-0000-000000000001}
+    # ICU used by contexts not yet wired to the JWT claim (e.g. the shift
+    # CurrentIcuAdapter, and the bed-grid dev fallback). Kept in sync with
+    # default-icu-id so the active shift resolves to the same ICU as the grid.
+    dev-default-icu-id: ${DEFAULT_ICU_ID:cccccccc-0000-0000-0000-000000000001}
     encryption:
       aes-secret-key: ${AES_SECRET_KEY:}
     # Self-issued JWT (HS256). secret must be >= 256-bit (32 bytes); supply via
