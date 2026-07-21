@@ -71,6 +71,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         log.info("Seeding demo dataset (Demo ICU + 6 patients)...");
         DemoContext ctx = seedInfrastructure();
         seedPatientsAndEvaluations(ctx);
+        removeStrayBeds();
         log.info("Demo dataset seeded.");
     }
 
@@ -237,5 +238,20 @@ public class DemoDataSeeder implements ApplicationRunner {
 
     private static BigDecimal bd(double v) {
         return BigDecimal.valueOf(v).setScale(SNAPSHOT_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Removes beds outside the Demo ICU (e.g. the V26 default-ICU beds recreated
+     * by Flyway) so the hospital-wide occupancy summary counts only the demo —
+     * keeping it consistent with the ICU-scoped bed grid. Those beds are unused
+     * once the session is pointed at the Demo ICU (DEFAULT_ICU_ID).
+     */
+    private void removeStrayBeds() {
+        int removed = jdbcClient.sql("DELETE FROM icu_beds WHERE icu_id <> :demo")
+                .param("demo", UUID.fromString(DEMO_ICU_ID))
+                .update();
+        if (removed > 0) {
+            log.info("Removed {} non-demo bed(s) so occupancy reflects the Demo ICU only.", removed);
+        }
     }
 }

@@ -61,6 +61,15 @@ class DemoDataSeederIT {
                 """).query(Integer.class).single();
         assertThat(evaluations).isEqualTo(18);
 
+        // The Demo ICU must be the only ICU with beds so the global occupancy
+        // summary matches the ICU-scoped bed grid (V26 default-ICU beds removed).
+        Integer strayBeds = jdbcClient.sql("""
+                SELECT count(*) FROM icu_beds b
+                JOIN intensive_care_units i ON i.id = b.icu_id
+                WHERE i.code <> 'DEMO-ICU'
+                """).query(Integer.class).single();
+        assertThat(strayBeds).isZero();
+
         // Running again must be a no-op (idempotency guard).
         seeder.run(null);
         Integer patientsAfter = jdbcClient.sql("""
