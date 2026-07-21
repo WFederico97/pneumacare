@@ -141,6 +141,11 @@ app:
       display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:System Administrator}
       # No default — must be supplied in staging/prod. Rotate on first login.
       initial-password: ${PNMC_BOOTSTRAP_ADMIN_PASSWORD:}
+  demo:
+    # Seeds a curated demo dataset (6 patients + evaluations in a dedicated Demo
+    # ICU) on startup. Off by default; enabled only in .env.prod for demo builds.
+    seed:
+      enabled: ${DEMO_SEED_ENABLED:false}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topics:
