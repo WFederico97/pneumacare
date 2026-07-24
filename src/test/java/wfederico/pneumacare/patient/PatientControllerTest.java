@@ -219,26 +219,6 @@ class PatientControllerTest {
                 .andExpect(jsonPath("$.data.bedId").exists());
     }
 
-    @Test
-    @DisplayName("POST /api/v1/patients — missing icuId returns 400 with field error")
-    void createPatient_missingIcuId_returns400WithFieldError() throws Exception {
-        String body = """
-                {
-                  "firstName": "Juan",
-                  "lastName": "Pérez",
-                  "birthDate": "1989-05-14",
-                  "identifier": { "identifierTypeId": 1, "value": "35123456" },
-                  "bedId": "dddddddd-0000-0000-0000-000000000001"
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/patients")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.data.icuId").exists());
-    }
 
     @Test
     @DisplayName("POST /api/v1/patients — service throws BAD_REQUEST (bed not available) returns 400")

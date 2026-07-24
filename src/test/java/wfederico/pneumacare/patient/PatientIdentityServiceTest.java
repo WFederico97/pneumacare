@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.patient.application.PatientIdentityService;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.patient.domain.BedStatus;
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -69,6 +71,7 @@ class PatientIdentityServiceTest {
     @Mock private PatientRepository patientRepository;
     @Mock private IcuRepository icuRepository;
     @Mock private IcuBedRepository icuBedRepository;
+    @Mock private CurrentIcuPort currentIcuPort;
 
     @InjectMocks
     private PatientIdentityService service;
@@ -91,6 +94,9 @@ class PatientIdentityServiceTest {
 
     @BeforeEach
     void setUp() {
+        // The service resolves the ICU from the session, not the request.
+        lenient().when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
+
         dniType       = buildType(1, "DNI",       "Documento Nacional de Identidad");
         pasaporteType = buildType(5, "Pasaporte", "Pasaporte");
 
@@ -282,7 +288,7 @@ class PatientIdentityServiceTest {
     }
 
     private CreatePatientRequest requestWith(PatientIdentifierRequest identifier) {
-        return new CreatePatientRequest(FIRST_NAME, LAST_NAME, BIRTH_DATE, identifier, ICU_ID, BED_ID);
+        return new CreatePatientRequest(FIRST_NAME, LAST_NAME, BIRTH_DATE, identifier, BED_ID);
     }
 
     private PatientIdentityJpaEntity buildIdentityEntity(UUID id,

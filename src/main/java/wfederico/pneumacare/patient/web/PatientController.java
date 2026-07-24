@@ -151,7 +151,7 @@ public class PatientController {
     public ResponseEntity<ApiResponseBase<PatientResponse>> createPatient(
             @Valid @RequestBody CreatePatientRequest request) {
 
-        log.debug("Patient admission requested: icuId={}, bedId={}", request.icuId(), request.bedId());
+        log.debug("Patient admission requested: bedId={}", request.bedId());
         PatientResponse data = service.create(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)

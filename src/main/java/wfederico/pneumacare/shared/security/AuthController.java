@@ -13,53 +13,44 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
-import wfederico.pneumacare.shared.security.user.Role;
-import wfederico.pneumacare.shared.security.user.UserJpaEntity;
-import wfederico.pneumacare.shared.security.user.UserRepository;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 import wfederico.pneumacare.shared.web.dto.LoginRequest;
 import wfederico.pneumacare.shared.web.dto.LoginResponse;
-import wfederico.pneumacare.shared.web.dto.RegisterRequest;
 
 import java.time.Duration;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 
 /**
- * Authentication endpoints. Issues the JWT only as an HttpOnly cookie plus a
- * readable XSRF-TOKEN cookie; the body returns non-sensitive profile data only.
+ * Authentication endpoints: login and logout only. Issues the JWT solely as an
+ * HttpOnly cookie plus a readable XSRF-TOKEN cookie; the body returns
+ * non-sensitive profile data only.
+ *
+ * <p>There is deliberately <strong>no self-registration</strong>. It previously
+ * let an anonymous caller mint a THERAPIST or CHIEF_OF_GUARD account and receive
+ * a session immediately, which handed decrypted patient PII to anyone who could
+ * reach the app — defeating the Law 25.326 encryption applied at rest. Staff
+ * accounts are provisioned by an administrator through {@code /api/v1/users},
+ * which enforces the admin boundary.
  */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    /** Roles a user may self-assign at registration; privileged roles are admin-provisioned. */
-    private static final Set<Role> SELF_REGISTERABLE_ROLES =
-            EnumSet.of(Role.ROLE_THERAPIST, Role.ROLE_CHIEF_OF_GUARD);
-
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
 
     public AuthController(AuthenticationManager authenticationManager,
                          JwtService jwtService,
-                         JwtProperties jwtProperties,
-                         UserRepository userRepository,
-                         PasswordEncoder passwordEncoder) {
+                         JwtProperties jwtProperties) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
     }
 
     @PreAuthorize("permitAll()")
@@ -77,29 +68,6 @@ public class AuthController {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
         return authenticatedResponse(principal, "Autenticación exitosa");
-    }
-
-    @PreAuthorize("permitAll()")
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponseBase<LoginResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        if (!SELF_REGISTERABLE_ROLES.contains(request.role())) {
-            throw new BusinessLayerException("Rol no permitido para registro", HttpStatus.BAD_REQUEST);
-        }
-        if (userRepository.findByUsername(request.username()).isPresent()) {
-            throw new BusinessLayerException("El nombre de usuario ya está en uso", HttpStatus.CONFLICT);
-        }
-
-        UserJpaEntity user = UserJpaEntity.builder()
-                .username(request.username())
-                .passwordHash(passwordEncoder.encode(request.password()))
-                .displayName(request.displayName())
-                .enabled(true)
-                .roles(EnumSet.of(request.role()))
-                .build();
-        UserJpaEntity saved = userRepository.save(user);
-
-        // Issue the session immediately so the SPA lands authenticated after sign-up.
-        return authenticatedResponse(UserPrincipal.from(saved), "Registro exitoso");
     }
 
     private ResponseEntity<ApiResponseBase<LoginResponse>> authenticatedResponse(UserPrincipal principal, String message) {

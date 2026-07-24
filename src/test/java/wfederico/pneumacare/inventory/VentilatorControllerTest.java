@@ -139,7 +139,7 @@ class VentilatorControllerTest {
     @Test
     @DisplayName("GET returns 200 with a paginated envelope")
     void getListReturns200() throws Exception {
-        when(service.list(any(), eq(null))).thenReturn(new PageResponse<>(
+        when(service.list(any())).thenReturn(new PageResponse<>(
                 List.of(response(VentilatorStatus.AVAILABLE)), 0, 10, 1, 1));
 
         mockMvc.perform(get(URL).param("page", "0").param("size", "10"))

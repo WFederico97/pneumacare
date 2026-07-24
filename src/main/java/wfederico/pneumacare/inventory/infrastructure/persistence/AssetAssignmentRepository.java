@@ -25,4 +25,24 @@ public interface AssetAssignmentRepository extends JpaRepository<AssetAssignment
      */
     @Query(value = "SELECT EXISTS (SELECT 1 FROM patients WHERE id = :patientId)", nativeQuery = true)
     boolean patientExists(@Param("patientId") UUID patientId);
+
+    /**
+     * The patient's ICU and whether their episode is still open, by the same
+     * native-SQL convention as {@link #patientExists}. Empty when the patient
+     * does not exist.
+     *
+     * <p>Needed so a ventilator cannot be assigned across ICUs, or to an episode
+     * that has already been closed.
+     */
+    @Query(value = """
+            SELECT icu_id AS icuId, (clinical_status = 'ADMITTED') AS episodeOpen
+            FROM patients WHERE id = :patientId
+            """, nativeQuery = true)
+    Optional<PatientEpisodeRow> findPatientEpisode(@Param("patientId") UUID patientId);
+
+    /** Projection for {@link #findPatientEpisode}. */
+    interface PatientEpisodeRow {
+        UUID getIcuId();
+        boolean getEpisodeOpen();
+    }
 }

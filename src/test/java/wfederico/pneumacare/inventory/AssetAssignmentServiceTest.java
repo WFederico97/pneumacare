@@ -38,6 +38,7 @@ class AssetAssignmentServiceTest {
     private static final UUID VENTILATOR_ID = UUID.fromString("eeeeeeee-0000-0000-0000-000000000001");
     private static final UUID PATIENT_ID = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
     private static final UUID ASSIGNMENT_ID = UUID.fromString("dddddddd-0000-0000-0000-000000000009");
+    private static final UUID ICU_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
 
     @Mock
     private AssetAssignmentRepository assignmentRepository;
@@ -53,7 +54,7 @@ class AssetAssignmentServiceTest {
     void setUp() {
         ventilator = PhysicalVentilatorJpaEntity.builder()
                 .id(VENTILATOR_ID)
-                .icuId(UUID.randomUUID())
+                .icuId(ICU_ID)
                 .serialNumber("SN-001")
                 .status(VentilatorStatus.AVAILABLE)
                 .build();
@@ -77,7 +78,7 @@ class AssetAssignmentServiceTest {
     @DisplayName("assign: available ventilator + valid patient links and sets IN_USE")
     void assignHappyPath() {
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(true);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.of(episodeRow(ICU_ID, true)));
         when(assignmentRepository.existsByPatientIdAndReleasedAtIsNull(PATIENT_ID)).thenReturn(false);
         when(assignmentRepository.saveAndFlush(any(AssetAssignmentJpaEntity.class)))
                 .thenReturn(savedAssignment(null));
@@ -96,7 +97,7 @@ class AssetAssignmentServiceTest {
     void assignBlockedByMaintenance() {
         ventilator.setStatus(VentilatorStatus.MAINTENANCE);
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(true);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.of(episodeRow(ICU_ID, true)));
 
         assertThatThrownBy(() -> service.assign(assignRequest()))
                 .isInstanceOf(BusinessLayerException.class)
@@ -110,7 +111,7 @@ class AssetAssignmentServiceTest {
     void assignBlockedByInUse() {
         ventilator.setStatus(VentilatorStatus.IN_USE);
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(true);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.of(episodeRow(ICU_ID, true)));
 
         assertThatThrownBy(() -> service.assign(assignRequest()))
                 .isInstanceOf(BusinessLayerException.class)
@@ -133,7 +134,7 @@ class AssetAssignmentServiceTest {
     @DisplayName("assign: unknown patient yields 404")
     void assignUnknownPatient() {
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(false);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.assign(assignRequest()))
                 .isInstanceOf(BusinessLayerException.class)
@@ -145,7 +146,7 @@ class AssetAssignmentServiceTest {
     @DisplayName("assign: patient already has an active assignment yields 409")
     void assignPatientAlreadyAssigned() {
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(true);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.of(episodeRow(ICU_ID, true)));
         when(assignmentRepository.existsByPatientIdAndReleasedAtIsNull(PATIENT_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.assign(assignRequest()))
@@ -158,7 +159,7 @@ class AssetAssignmentServiceTest {
     @DisplayName("assign: unique-index race maps to 409")
     void assignRaceMapsToConflict() {
         when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
-        when(assignmentRepository.patientExists(PATIENT_ID)).thenReturn(true);
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID)).thenReturn(Optional.of(episodeRow(ICU_ID, true)));
         when(assignmentRepository.existsByPatientIdAndReleasedAtIsNull(PATIENT_ID)).thenReturn(false);
         when(assignmentRepository.saveAndFlush(any(AssetAssignmentJpaEntity.class)))
                 .thenThrow(new DataIntegrityViolationException("uq_asset_assignments_active_ventilator"));
@@ -266,5 +267,44 @@ class AssetAssignmentServiceTest {
         assertThat(ventilator.getStatus()).isEqualTo(VentilatorStatus.AVAILABLE);
         verify(assignmentRepository).save(assignment);
         verify(ventilatorRepository).save(ventilator);
+    }
+
+    /** Builds the repository projection the service reads. */
+    private static AssetAssignmentRepository.PatientEpisodeRow episodeRow(UUID icuId, boolean open) {
+        return new AssetAssignmentRepository.PatientEpisodeRow() {
+            @Override public UUID getIcuId() { return icuId; }
+            @Override public boolean getEpisodeOpen() { return open; }
+        };
+    }
+
+    @Test
+    @DisplayName("assign: rejects a ventilator from another ICU")
+    void assignRejectsCrossIcuVentilator() {
+        UUID otherIcu = UUID.fromString("eeeeeeee-0000-0000-0000-00000000000f");
+        when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID))
+                .thenReturn(Optional.of(episodeRow(otherIcu, true)));
+
+        assertThatThrownBy(() -> service.assign(new AssignAssetRequest(VENTILATOR_ID, PATIENT_ID)))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        verify(assignmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("assign: rejects a closed episode")
+    void assignRejectsClosedEpisode() {
+        when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
+        when(assignmentRepository.findPatientEpisode(PATIENT_ID))
+                .thenReturn(Optional.of(episodeRow(ICU_ID, false)));
+
+        assertThatThrownBy(() -> service.assign(new AssignAssetRequest(VENTILATOR_ID, PATIENT_ID)))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        verify(assignmentRepository, never()).saveAndFlush(any());
     }
 }

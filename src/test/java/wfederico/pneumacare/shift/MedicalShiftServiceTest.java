@@ -9,7 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
-import wfederico.pneumacare.shift.application.CurrentIcuPort;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.application.IcuExistencePort;
 import wfederico.pneumacare.shift.application.MedicalShiftService;

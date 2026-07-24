@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 import wfederico.pneumacare.shift.application.ShiftActivityPort.ShiftActivity;

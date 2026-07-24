@@ -1,4 +1,4 @@
-package wfederico.pneumacare.shift.application;
+package wfederico.pneumacare.shared.security;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;

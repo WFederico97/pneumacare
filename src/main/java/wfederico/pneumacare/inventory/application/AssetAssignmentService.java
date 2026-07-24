@@ -22,6 +22,7 @@ import wfederico.pneumacare.shared.exception.BusinessLayerException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.EPISODE_CLOSED;
 /**
  * Assigns and releases physical ventilators to/from patients.
  *
@@ -47,9 +48,21 @@ public class AssetAssignmentService {
                         "No se encontró el ventilador con id: " + request.ventilatorId(),
                         HttpStatus.NOT_FOUND));
 
-        if (!assignmentRepository.patientExists(request.patientId())) {
+        AssetAssignmentRepository.PatientEpisodeRow episode =
+                assignmentRepository.findPatientEpisode(request.patientId())
+                        .orElseThrow(() -> new BusinessLayerException(
+                                "No se encontró el paciente con id: " + request.patientId(),
+                                HttpStatus.NOT_FOUND));
+
+        // Equipment stays within its unit: assigning across ICUs corrupts every
+        // per-ICU utilisation figure and hides misfiled equipment.
+        if (!ventilator.getIcuId().equals(episode.getIcuId())) {
             throw new BusinessLayerException(
-                    "No se encontró el paciente con id: " + request.patientId(), HttpStatus.NOT_FOUND);
+                    "El ventilador pertenece a otra UCI", HttpStatus.CONFLICT);
+        }
+
+        if (!episode.getEpisodeOpen()) {
+            throw new BusinessLayerException(EPISODE_CLOSED, HttpStatus.CONFLICT);
         }
 
         if (ventilator.getStatus() != VentilatorStatus.AVAILABLE) {

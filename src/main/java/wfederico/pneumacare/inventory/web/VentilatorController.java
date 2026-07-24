@@ -60,18 +60,17 @@ public class VentilatorController {
     }
 
     @Operation(summary = "List ventilators (paginated)",
-            description = "Pages the ventilator inventory, optionally filtered by ICU.")
+            description = "Pages the ventilator inventory of the caller's ICU.")
     @PreAuthorize("hasAnyRole('ADMIN','CHIEF_OF_GUARD','THERAPIST')")
     @GetMapping
     public ResponseEntity<ApiResponseBase<PageResponse<VentilatorResponse>>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) UUID icuId) {
+            @RequestParam(defaultValue = "20") int size) {
         PageRequest pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
                 Sort.by("serialNumber").ascending());
-        PageResponse<VentilatorResponse> data = service.list(pageable, icuId);
+        PageResponse<VentilatorResponse> data = service.list(pageable);
         return ResponseEntity.ok(
                 envelope(HttpStatus.OK, RequestMessageConstants.VENTILATORS_RETRIEVED, data));
     }

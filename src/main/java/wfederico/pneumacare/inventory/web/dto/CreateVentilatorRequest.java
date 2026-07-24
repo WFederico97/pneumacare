@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import wfederico.pneumacare.inventory.domain.VentilatorBrand;
 
-import java.util.UUID;
 
 /**
  * Registration payload for a physical ventilator. An unknown {@code brand}
@@ -14,7 +13,6 @@ import java.util.UUID;
 public record CreateVentilatorRequest(
         @NotBlank @Size(max = 100) String serialNumber,
         @NotNull VentilatorBrand brand,
-        @NotBlank @Size(max = 100) String modelName,
-        @NotNull UUID icuId
+        @NotBlank @Size(max = 100) String modelName
 ) {
 }

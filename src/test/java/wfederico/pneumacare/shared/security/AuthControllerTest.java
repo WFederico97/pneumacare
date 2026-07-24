@@ -122,49 +122,25 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Self-registration was removed: it let an anonymous caller mint a clinical
+     * account and receive a session immediately, exposing patient PII. This test
+     * fails if the endpoint ever comes back.
+     */
     @Test
-    void register_validRequest_createsUserSetsCookieAndReturnsProfile() throws Exception {
-        when(userRepository.findByUsername("nurse")).thenReturn(java.util.Optional.empty());
-        when(userRepository.save(any(wfederico.pneumacare.shared.security.user.UserJpaEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtService.issueToken(any(UserPrincipal.class))).thenReturn("the.jwt.token");
-
+    void register_endpointNoLongerExists_issuesNoSession() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType("application/json")
                         .content("{\"username\":\"nurse\",\"password\":\"secret12\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.displayName").value("N. Urse"))
-                .andExpect(jsonPath("$.data.roles[0]").value("ROLE_THERAPIST"))
-                .andExpect(content().string(not(containsString("the.jwt.token"))))
-                .andExpect(cookie().value("PNMC_AT", "the.jwt.token"))
-                .andExpect(cookie().httpOnly("PNMC_AT", true));
-    }
-
-    @Test
-    void register_duplicateUsername_returns409() throws Exception {
-        when(userRepository.findByUsername("nurse"))
-                .thenReturn(java.util.Optional.of(new wfederico.pneumacare.shared.security.user.UserJpaEntity()));
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType("application/json")
-                        .content("{\"username\":\"nurse\",\"password\":\"secret12\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    void register_privilegedRole_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType("application/json")
-                        .content("{\"username\":\"root\",\"password\":\"secret12\",\"displayName\":\"Root\",\"role\":\"ROLE_ADMIN\"}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void register_shortPassword_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType("application/json")
-                        .content("{\"username\":\"nurse\",\"password\":\"short\",\"displayName\":\"N. Urse\",\"role\":\"ROLE_THERAPIST\"}"))
-                .andExpect(status().isBadRequest());
+                // The route is gone. What matters is that no account is created and
+                // no session cookie comes back; the app maps unmapped paths to 500.
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    if (status >= 200 && status < 300) {
+                        throw new AssertionError("register must not succeed, got " + status);
+                    }
+                })
+                .andExpect(cookie().doesNotExist("PNMC_AT"));
     }
 
     @Test
