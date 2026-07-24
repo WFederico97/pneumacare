@@ -325,9 +325,23 @@ a `404` status.
 437 backend unit tests pass. Demo dataset intact and the demo admin password
 restored to its original value.
 
-**Not addressed by finding 8:** a password change does not invalidate sessions
-already open on other devices — that needs token versioning (see finding 3's
-second option). The form says so explicitly.
+### Follow-ups (fixed 2026-07-24, `e9ef4b3` / frontend `c786bdf`)
 
-All nine findings are now closed. The one observation still open is that
-unmapped API paths return `500` rather than `404`.
+The three caveats left by the fixes above are now closed too.
+
+| Item | Check | Result |
+|---|---|---|
+| Token versioning | Two sessions; one changes the password | the changing device stays `200`, the other session drops to `401` |
+| Anonymous status | Unauthenticated `GET` and `POST` to protected endpoints | `401` (was `403` on POST — CSRF rejected before auth ran) |
+| Unmapped paths | Authenticated request to `/api/v1/does-not-exist` | `404 "Recurso no encontrado"` (was `500`) |
+
+`V31` adds `users.token_version`, embedded as a JWT claim and re-checked on every
+request. A password change bumps it, ending every session minted under the old
+password; the caller's own session is re-issued at the new generation so they are
+not logged out. Tokens issued before the column existed carry no claim and are
+treated as stale, so every user signs in once after deploy.
+
+439 backend unit tests pass. The demo admin password was rotated during
+verification and restored.
+
+All nine findings and all follow-ups are closed.
