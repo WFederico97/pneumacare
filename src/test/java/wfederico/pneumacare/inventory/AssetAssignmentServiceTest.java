@@ -233,4 +233,38 @@ class AssetAssignmentServiceTest {
 
         assertThat(service.findActiveForPatient(PATIENT_ID)).isNull();
     }
+
+    @Test
+    @DisplayName("releaseForPatient: no-op when the patient has no active assignment")
+    void releaseForPatientIsNoOpWhenNoActiveAssignment() {
+        when(assignmentRepository.findByPatientIdAndReleasedAtIsNull(PATIENT_ID))
+                .thenReturn(Optional.empty());
+
+        service.releaseForPatient(PATIENT_ID);
+
+        verify(assignmentRepository, never()).save(any());
+        verify(ventilatorRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("releaseForPatient: releases the assignment and frees the ventilator")
+    void releaseForPatientReleasesAssignmentAndFreesVentilator() {
+        AssetAssignmentJpaEntity assignment = AssetAssignmentJpaEntity.builder()
+                .id(ASSIGNMENT_ID)
+                .ventilatorId(VENTILATOR_ID)
+                .patientId(PATIENT_ID)
+                .build();
+        ventilator.setStatus(VentilatorStatus.IN_USE);
+
+        when(assignmentRepository.findByPatientIdAndReleasedAtIsNull(PATIENT_ID))
+                .thenReturn(Optional.of(assignment));
+        when(ventilatorRepository.findById(VENTILATOR_ID)).thenReturn(Optional.of(ventilator));
+
+        service.releaseForPatient(PATIENT_ID);
+
+        assertThat(assignment.getReleasedAt()).isNotNull();
+        assertThat(ventilator.getStatus()).isEqualTo(VentilatorStatus.AVAILABLE);
+        verify(assignmentRepository).save(assignment);
+        verify(ventilatorRepository).save(ventilator);
+    }
 }

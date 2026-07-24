@@ -104,6 +104,26 @@ public class AssetAssignmentService {
     }
 
     /**
+     * Releases the patient's active ventilator assignment, if any, returning
+     * the ventilator to the AVAILABLE pool. No-op when nothing is assigned —
+     * discharge must not fail because the patient had no ventilator.
+     * Invoked inside the discharge transaction (PatientDischargeService).
+     */
+    @Transactional
+    public void releaseForPatient(UUID patientId) {
+        assignmentRepository.findByPatientIdAndReleasedAtIsNull(patientId).ifPresent(assignment -> {
+            assignment.setReleasedAt(OffsetDateTime.now());
+            assignmentRepository.save(assignment);
+            ventilatorRepository.findById(assignment.getVentilatorId()).ifPresent(ventilator -> {
+                ventilator.setStatus(VentilatorStatus.AVAILABLE);
+                ventilatorRepository.save(ventilator);
+            });
+            log.info("Released ventilator assignment on discharge: patientId={}, ventilatorId={}",
+                    patientId, assignment.getVentilatorId());
+        });
+    }
+
+    /**
      * The patient's current (unreleased) assignment with the ventilator serial,
      * or {@code null} when no ventilator is assigned.
      */
