@@ -168,6 +168,133 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
         seedAirwayEvents(ctx, patientIds);
         seedWeaningTrials(ctx, patientIds);
+        seedClosedEpisodes(ctx, dniType);
+    }
+
+    /**
+     * Closed backdated episodes so the executive metrics (true ALOS, turnover,
+     * mortality, readmission) are non-zero on the demo: 2 HOME, 1 WARD,
+     * 1 TRANSFER_EXTERNAL, 1 DECEASED (weaning failure), 1 readmission pair.
+     */
+    private void seedClosedEpisodes(DemoContext ctx, PatientIdentifierTypeJpaEntity dniType) {
+        UUID icuId = UUID.fromString(DEMO_ICU_ID);
+        OffsetDateTime now = OffsetDateTime.now();
+
+        record ClosedEpisode(String first, String last, String disposition, int admitted, int discharged) {}
+        List<ClosedEpisode> episodes = List.of(
+                new ClosedEpisode("Hugo", "Alvarez", "HOME", 20, 14),
+                new ClosedEpisode("Nora", "Benitez", "HOME", 18, 12),
+                new ClosedEpisode("Ivan", "Castro", "WARD", 16, 9),
+                new ClosedEpisode("Rita", "Dominguez", "TRANSFER_EXTERNAL", 15, 10),
+                new ClosedEpisode("Oscar", "Esposito", "DECEASED", 21, 14));
+
+        List<UUID> closedIds = new ArrayList<>();
+        for (int i = 0; i < episodes.size(); i++) {
+            ClosedEpisode e = episodes.get(i);
+            UUID identityId = seedClosedIdentity(e.first(), e.last(), dniType, 100 + i);
+            closedIds.add(insertClosedEpisode(icuId, identityId, e.disposition(),
+                    now.minusDays(e.admitted()), now.minusDays(e.discharged())));
+        }
+
+        seedWeaningFailureHistory(ctx, closedIds.get(4), now);
+        seedReadmissionPair(ctx, icuId, dniType, now);
+    }
+
+    /** PII identity + DNI for a closed-episode demo patient (index offset avoids DNI collisions). */
+    private UUID seedClosedIdentity(String first, String last,
+                                    PatientIdentifierTypeJpaEntity dniType, int index) {
+        PatientIdentityJpaEntity identity = PatientIdentityJpaEntity.builder()
+                .firstName(first)
+                .lastName(last)
+                .birthDate(java.time.LocalDate.of(1960, 1, 1).plusYears(index % 30))
+                .build();
+        PatientIdentifierJpaEntity dni = PatientIdentifierJpaEntity.builder()
+                .patientIdentifierName(String.format("%08d", 40_000_000 + index * 101_010))
+                .patientIdentity(identity)
+                .patientIdentifierType(dniType)
+                .build();
+        identity.addIdentifier(dni);
+        return patientIdentityRepository.saveAndFlush(identity).getId();
+    }
+
+    /** Closed episode row: no bed, terminus set, status derived from the disposition. */
+    private UUID insertClosedEpisode(UUID icuId, UUID identityId, String disposition,
+                                     OffsetDateTime admitted, OffsetDateTime discharged) {
+        String status = "TRANSFER_EXTERNAL".equals(disposition) ? "TRANSFERRED" : "DISCHARGED";
+        UUID patientId = UUID.randomUUID();
+        jdbcClient.sql("""
+                INSERT INTO patients
+                    (id, icu_id, identity_id, bed_id, clinical_status, respiratory_status,
+                     admission_date, discharge_date, disposition)
+                VALUES
+                    (:id, :icu, :identity, NULL, :status, 'SPONTANEOUS', :admitted, :discharged, :disposition)
+                """)
+                .param("id", patientId)
+                .param("icu", icuId)
+                .param("identity", identityId)
+                .param("status", status)
+                .param("admitted", admitted)
+                .param("discharged", discharged)
+                .param("disposition", disposition)
+                .update();
+        return patientId;
+    }
+
+    /**
+     * Weaning-failure history for the deceased episode: two failed SBTs, an
+     * extubation and a reintubation 30 h later (inside the 48 h failure window).
+     */
+    private void seedWeaningFailureHistory(DemoContext ctx, UUID patientId, OffsetDateTime now) {
+        OffsetDateTime intubated = now.minusDays(21);
+        OffsetDateTime extubated = now.minusDays(17);
+        OffsetDateTime reintubated = extubated.plusHours(30);
+        insertAirwayEvent(ctx, patientId, "INTUBATION", intubated);
+        insertAirwayEvent(ctx, patientId, "EXTUBATION", extubated);
+        insertAirwayEvent(ctx, patientId, "INTUBATION", reintubated);
+        for (int a = 0; a < 2; a++) {
+            jdbcClient.sql("""
+                    INSERT INTO spontaneous_breathing_trials
+                        (id, patient_id, shift_id, duration_minutes, outcome, created_by, created_at)
+                    VALUES (:id, :patient, :shift, 30, 'FAILURE', :createdBy, :recordedAt)
+                    """)
+                    .param("id", UUID.randomUUID())
+                    .param("patient", patientId)
+                    .param("shift", ctx.shiftId())
+                    .param("createdBy", ctx.adminUserId())
+                    .param("recordedAt", now.minusDays(18).plusHours(6L * a))
+                    .update();
+        }
+    }
+
+    private void insertAirwayEvent(DemoContext ctx, UUID patientId, String type, OffsetDateTime time) {
+        jdbcClient.sql("""
+                INSERT INTO airway_events (id, patient_id, shift_id, event_time, event_type, created_by)
+                VALUES (:id, :patient, :shift, :time, :type, :createdBy)
+                """)
+                .param("id", UUID.randomUUID())
+                .param("patient", patientId)
+                .param("shift", ctx.shiftId())
+                .param("time", time)
+                .param("type", type)
+                .param("createdBy", ctx.adminUserId())
+                .update();
+    }
+
+    /** Same identity, second episode opening 3 days after the first closes (7-day readmission). */
+    private void seedReadmissionPair(DemoContext ctx, UUID icuId,
+                                     PatientIdentifierTypeJpaEntity dniType, OffsetDateTime now) {
+        UUID identityId = seedClosedIdentity("Sofia", "Ferrari", dniType, 110);
+        insertClosedEpisode(icuId, identityId, "WARD", now.minusDays(12), now.minusDays(6));
+        jdbcClient.sql("""
+                INSERT INTO patients
+                    (id, icu_id, identity_id, bed_id, clinical_status, respiratory_status, admission_date)
+                VALUES (:id, :icu, :identity, NULL, 'ADMITTED', 'SPONTANEOUS', :admitted)
+                """)
+                .param("id", UUID.randomUUID())
+                .param("icu", icuId)
+                .param("identity", identityId)
+                .param("admitted", now.minusDays(3))
+                .update();
     }
 
     /**

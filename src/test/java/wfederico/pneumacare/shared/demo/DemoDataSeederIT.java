@@ -51,7 +51,7 @@ class DemoDataSeederIT {
                 JOIN intensive_care_units i ON i.id = p.icu_id
                 WHERE i.code = 'DEMO-ICU'
                 """).query(Integer.class).single();
-        assertThat(patients).isEqualTo(6);
+        assertThat(patients).isEqualTo(13); // 6 open + 6 closed + 1 readmission-open
 
         Integer evaluations = jdbcClient.sql("""
                 SELECT count(*) FROM evaluations e
@@ -77,7 +77,7 @@ class DemoDataSeederIT {
                 JOIN intensive_care_units i ON i.id = p.icu_id
                 WHERE i.code = 'DEMO-ICU'
                 """).query(Integer.class).single();
-        assertThat(identifiers).isEqualTo(6);
+        assertThat(identifiers).isEqualTo(13); // one DNI per episode row: the readmission identity joins twice
 
         // One OPEN shift exists in the Demo ICU.
         Integer openShifts = jdbcClient.sql("""
@@ -94,6 +94,27 @@ class DemoDataSeederIT {
                 JOIN intensive_care_units i ON i.id = p.icu_id
                 WHERE i.code = 'DEMO-ICU'
                 """).query(Integer.class).single();
-        assertThat(patientsAfter).isEqualTo(6);
+        assertThat(patientsAfter).isEqualTo(13);
+    }
+
+    @Test
+    void seedsClosedEpisodesForExecutiveMetrics() {
+        Integer closed = jdbcClient.sql(
+                "SELECT count(*) FROM patients WHERE discharge_date IS NOT NULL")
+                .query(Integer.class).single();
+        assertThat(closed).isEqualTo(6);
+
+        Integer deceased = jdbcClient.sql(
+                "SELECT count(*) FROM patients WHERE disposition = 'DECEASED'")
+                .query(Integer.class).single();
+        assertThat(deceased).isEqualTo(1);
+
+        // Readmission pair: one identity with two episodes (one closed + one open).
+        Integer readmittedIdentities = jdbcClient.sql("""
+                SELECT count(*) FROM (
+                    SELECT identity_id FROM patients GROUP BY identity_id HAVING count(*) > 1
+                ) multi
+                """).query(Integer.class).single();
+        assertThat(readmittedIdentities).isEqualTo(1);
     }
 }
