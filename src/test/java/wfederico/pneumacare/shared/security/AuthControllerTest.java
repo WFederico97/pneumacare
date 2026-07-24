@@ -15,6 +15,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,10 +27,15 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -67,6 +73,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private wfederico.pneumacare.shared.security.user.UserRepository userRepository;
+
+    @MockitoBean
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -149,5 +158,78 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(cookie().maxAge("PNMC_AT", 0))
                 .andExpect(cookie().maxAge("XSRF-TOKEN", 0));
+    }
+
+    // ── Password change ───────────────────────────────────────────────────
+
+    private wfederico.pneumacare.shared.security.user.UserJpaEntity storedUser(UUID id) {
+        wfederico.pneumacare.shared.security.user.UserJpaEntity user =
+                new wfederico.pneumacare.shared.security.user.UserJpaEntity();
+        user.setId(id);
+        user.setUsername("jdoe");
+        user.setDisplayName("J. Doe");
+        user.setPasswordHash("$2a$10$storedhash");
+        user.setEnabled(true);
+        user.setRoles(java.util.EnumSet.of(wfederico.pneumacare.shared.security.user.Role.ROLE_THERAPIST));
+        return user;
+    }
+
+    @Test
+    @WithMockUser
+    void changePassword_wrongCurrentPassword_returns403AndDoesNotSave() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.of(storedUser(id)));
+        when(passwordEncoder.matches(eq("wrong"), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/auth/password")
+                        .with(csrf())
+                        .with(authentication(principalAuth(id)))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"brandnew123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @WithMockUser
+    void changePassword_shortNewPassword_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password")
+                        .with(csrf())
+                        .with(authentication(principalAuth(UUID.randomUUID())))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"current123\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @WithMockUser
+    void changePassword_valid_savesNewHashAndReissuesCookie() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(userRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.of(storedUser(id)));
+        when(passwordEncoder.matches(eq("current123"), anyString())).thenReturn(true);
+        when(passwordEncoder.matches(eq("brandnew123"), anyString())).thenReturn(false);
+        when(passwordEncoder.encode("brandnew123")).thenReturn("$2a$10$newhash");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.issueToken(any(UserPrincipal.class))).thenReturn("fresh.jwt.token");
+
+        mockMvc.perform(post("/api/v1/auth/password")
+                        .with(csrf())
+                        .with(authentication(principalAuth(id)))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"current123\",\"newPassword\":\"brandnew123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(cookie().value("PNMC_AT", "fresh.jwt.token"))
+                .andExpect(cookie().httpOnly("PNMC_AT", true));
+
+        verify(userRepository).save(any());
+    }
+
+    /** An authentication whose name is the user's UUID, as the JWT sub claim would be. */
+    private static org.springframework.security.core.Authentication principalAuth(UUID id) {
+        return new UsernamePasswordAuthenticationToken(
+                id.toString(), null, List.of(new SimpleGrantedAuthority("ROLE_THERAPIST")));
     }
 }

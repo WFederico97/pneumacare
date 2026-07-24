@@ -12,18 +12,24 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.user.UserJpaEntity;
+import wfederico.pneumacare.shared.security.user.UserRepository;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
+import wfederico.pneumacare.shared.web.dto.ChangePasswordRequest;
 import wfederico.pneumacare.shared.web.dto.LoginRequest;
 import wfederico.pneumacare.shared.web.dto.LoginResponse;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Authentication endpoints: login and logout only. Issues the JWT solely as an
@@ -44,13 +50,19 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AuthController(AuthenticationManager authenticationManager,
                          JwtService jwtService,
-                         JwtProperties jwtProperties) {
+                         JwtProperties jwtProperties,
+                         UserRepository userRepository,
+                         PasswordEncoder passwordEncoder) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PreAuthorize("permitAll()")
@@ -86,6 +98,67 @@ public class AuthController {
                         .data(new LoginResponse(principal.getDisplayName(), roles))
                         .traceId(MDC.get("traceId"))
                         .build());
+    }
+
+    /**
+     * Changes the signed-in user's own password.
+     *
+     * <p>Required so a bootstrap or shared credential can actually be rotated:
+     * previously only an administrator could change someone else's password, and
+     * the sole administrator could not change their own.
+     *
+     * <p>A fresh cookie is issued so the caller stays signed in. Sessions already
+     * open elsewhere keep working until their token expires — revoking those needs
+     * token versioning, which is not implemented.
+     */
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/password")
+    public ResponseEntity<ApiResponseBase<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UUID userId = resolveUserId(authentication);
+
+        UserJpaEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessLayerException("No autenticado", HttpStatus.UNAUTHORIZED));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BusinessLayerException("La contraseña actual es incorrecta", HttpStatus.FORBIDDEN);
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BusinessLayerException(
+                    "La nueva contraseña debe ser distinta de la actual", HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        // Re-issue the session so the caller is not silently logged out.
+        String token = jwtService.issueToken(UserPrincipal.from(user));
+        ResponseCookie jwtCookie =
+                buildCookie(jwtProperties.getCookieName(), token, true, jwtProperties.getExpiration());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(ApiResponseBase.<Void>builder()
+                        .status(HttpStatus.OK.value())
+                        .message("Contraseña actualizada")
+                        .traceId(MDC.get("traceId"))
+                        .build());
+    }
+
+    /** The authenticated user's UUID, from the JWT {@code sub} claim. */
+    private UUID resolveUserId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new BusinessLayerException("No autenticado", HttpStatus.UNAUTHORIZED);
+        }
+        Object principal = authentication.getPrincipal();
+        String subject = principal instanceof Jwt jwt ? jwt.getSubject() : authentication.getName();
+        try {
+            return UUID.fromString(subject);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessLayerException("No autenticado", HttpStatus.UNAUTHORIZED);
+        }
     }
 
     @PreAuthorize("permitAll()")
