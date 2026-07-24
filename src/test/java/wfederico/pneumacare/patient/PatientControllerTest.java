@@ -79,6 +79,10 @@ class PatientControllerTest {
     @MockitoBean
     private PatientIdentityService service;
 
+    /** Satisfies the controller's discharge dependency; endpoint behaviour is covered in PatientDischargeIT. */
+    @MockitoBean
+    private wfederico.pneumacare.patient.application.PatientDischargeService dischargeService;
+
     /** Satisfies SecurityConfig constructor — no live Redis needed. */
     @MockitoBean
     private StringRedisTemplate redisTemplate;
