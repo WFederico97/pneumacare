@@ -8,12 +8,12 @@ Severity is about clinical and data risk, not effort.
 
 | # | Severity | Finding | Status |
 |---|---|---|---|
-| 1 | **Critical** | Anonymous self-registration grants clinical roles and full patient PII | Open |
-| 2 | **High** | Patient admission is broken — hardcoded ICU id | Open |
-| 3 | **High** | JWT stays valid after the user is deleted or disabled | Open |
-| 4 | **Medium** | New ventilators are filed in the wrong ICU | Open |
-| 5 | **Medium** | Ventilators can be assigned across ICUs | Open |
-| 6 | **Medium** | Ventilator inventory is not ICU-scoped | Open |
+| 1 | **Critical** | Anonymous self-registration grants clinical roles and full patient PII | **Fixed** (5c25c4d) |
+| 2 | **High** | Patient admission is broken — hardcoded ICU id | **Fixed** (5c25c4d) |
+| 3 | **High** | JWT stays valid after the user is deleted or disabled | **Fixed** (5c25c4d) |
+| 4 | **Medium** | New ventilators are filed in the wrong ICU | **Fixed** (5c25c4d) |
+| 5 | **Medium** | Ventilators can be assigned across ICUs | **Fixed** (5c25c4d) |
+| 6 | **Medium** | Ventilator inventory is not ICU-scoped | **Fixed** (5c25c4d) |
 | 7 | **Low** | Closed episodes still show clinical action buttons | Open |
 | 8 | **Low** | No password change for the signed-in user | Open |
 | 9 | **Low** | Stale success message persists next to a new error | Open |
@@ -283,3 +283,32 @@ Findings 2, 4, 5 and 6 are all the same underlying mistake: **the client is trus
 ## Test data
 
 All E2E artefacts were removed: user `e2e_intruder`, patient *Paciente E2E*, bed `E2E-01`, ventilator `E2E-VENT-001` and its assignment. The demo dataset is intact (13 patient episodes, 6 beds, 3 ventilators, one open shift). `DEMO-VENT-003` remains misfiled in UTI-01 — pre-existing, see finding 4.
+
+
+---
+
+## Fix verification (2026-07-24, after `5c25c4d` / frontend `f1be0ec`)
+
+Each fix re-tested against the rebuilt production stack:
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `POST /auth/register` as anonymous | `403`, no session cookie, no user row created (`users = admin` only) |
+| 2 | `POST /patients` with **no** `icuId` | `201 Patient admitted successfully` — previously impossible |
+| 3 | Live session, account then disabled | `200` → `401`; also `401` after deletion |
+| 4 | `POST /ventilators` with **no** `icuId` | filed in the session ICU (`eeeeeeee-…`) |
+| 5 | Assign a UTI-01 ventilator to a DEMO-ICU patient | `409 "El ventilador pertenece a otra UCI"` |
+| 5b | Assign to a closed episode | `409 "El episodio del paciente está cerrado"` |
+| 6 | `GET /ventilators` | only the session ICU's three units |
+
+434 backend unit tests pass. `DEMO-VENT-003` was moved back to DEMO-ICU. Verification
+artefacts removed; demo dataset intact (1 user, 13 episodes, 6 beds, 3 ventilators).
+
+**Observed while fixing, not yet addressed:** unmapped API paths return `500`
+rather than `404` — `GlobalExceptionHandler` catches `NoResourceFoundException`
+in its generic `Exception` handler. Harmless to clients but noisy for monitoring,
+and it is why the finding-1 regression test asserts "no session issued" instead of
+a `404` status.
+
+Findings 7–9 (closed-episode buttons, no password change, stale success message)
+remain open.
