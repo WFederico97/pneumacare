@@ -61,10 +61,8 @@ ALTER TABLE users
     ADD CONSTRAINT ck_users_status
         CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'));
 
--- physical_ventilators
-ALTER TABLE physical_ventilators
-    ADD CONSTRAINT ck_physical_ventilators_status
-        CHECK (status IN ('AVAILABLE', 'IN_USE', 'MAINTENANCE', 'DECOMMISSIONED'));
+-- physical_ventilators — status CHECK is added by V17 to match the
+-- VentilatorStatus enum (AVAILABLE, IN_USE, MAINTENANCE); not defined here.
 
 -- icu_beds  (mirrors BedStatus enum: AVAILABLE, OCCUPIED, MAINTENANCE)
 ALTER TABLE icu_beds
@@ -86,10 +84,8 @@ ALTER TABLE patient_consents
     ADD CONSTRAINT ck_patient_consents_status
         CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED'));
 
--- clinical_alerts_log
-ALTER TABLE clinical_alerts_log
-    ADD CONSTRAINT ck_clinical_alerts_delivery_status
-        CHECK (delivery_status IN ('PENDING', 'SENT', 'FAILED', 'RETRYING'));
+-- clinical_alerts_log — table created by V16 (PNMC-100) with its own status
+-- CHECK constraint (PENDING/DELIVERED/FAILED); no additional constraint here.
 
 
 -- ---------------------------------------------------------------------------

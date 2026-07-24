@@ -26,15 +26,22 @@ public record IcuBedResponse(
                 description = "UUID of the admitted patient occupying this bed, null when not OCCUPIED.",
                 example = "aaaaaaaa-0000-0000-0000-000000000001",
                 nullable = true)
-        UUID patientId) {
+        UUID patientId,
 
-    /** Maps a {@link IcuBedJpaEntity} to this DTO with no patient context (AVAILABLE / MAINTENANCE beds). */
+        @Schema(
+                description = "True when the occupying patient's latest evaluation tripped a clinical " +
+                        "threshold. Drives the pulsating critical-alert styling on the bed grid.",
+                example = "false")
+        boolean criticalAlert) {
+
+    /** Maps a {@link IcuBedJpaEntity} to this DTO with no patient context (AVAILABLE beds). */
     public static IcuBedResponse from(IcuBedJpaEntity entity) {
         return new IcuBedResponse(
                 entity.getId(),
                 entity.getBedNumber(),
                 entity.getStatus(),
-                null);
+                null,
+                false);
     }
 
     /** Maps a {@link IcuBedJpaEntity} to this DTO enriched with the admitted patient UUID. */
@@ -43,7 +50,18 @@ public record IcuBedResponse(
                 entity.getId(),
                 entity.getBedNumber(),
                 entity.getStatus(),
-                patientId);
+                patientId,
+                false);
+    }
+
+    /** Maps a {@link IcuBedJpaEntity} to this DTO with patient context and current alert state. */
+    public static IcuBedResponse from(IcuBedJpaEntity entity, UUID patientId, boolean criticalAlert) {
+        return new IcuBedResponse(
+                entity.getId(),
+                entity.getBedNumber(),
+                entity.getStatus(),
+                patientId,
+                criticalAlert);
     }
 }
 

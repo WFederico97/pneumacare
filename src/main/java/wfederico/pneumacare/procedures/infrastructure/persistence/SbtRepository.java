@@ -1,6 +1,7 @@
 package wfederico.pneumacare.procedures.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import wfederico.pneumacare.procedures.domain.ToleranceResult;
 
 import java.time.OffsetDateTime;
@@ -14,4 +15,15 @@ public interface SbtRepository extends JpaRepository<SbtJpaEntity, UUID> {
 
     /** Count of SBTs with a given outcome since the given instant (analytics weaning). */
     long countByToleranceResultAndCreatedAtAfter(ToleranceResult toleranceResult, OffsetDateTime since);
+
+    /** Per-patient SBT attempt counts since the given instant (WIND classification). */
+    @Query("select s.patientId as patientId, count(s) as total from SbtJpaEntity s " +
+           "where s.createdAt >= :since group by s.patientId")
+    List<PatientSbtCount> countAttemptsByPatientSince(OffsetDateTime since);
+
+    /** Projection for {@link #countAttemptsByPatientSince(OffsetDateTime)}. */
+    interface PatientSbtCount {
+        UUID getPatientId();
+        long getTotal();
+    }
 }

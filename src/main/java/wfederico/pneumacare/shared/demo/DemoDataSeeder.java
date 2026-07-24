@@ -160,9 +160,65 @@ public class DemoDataSeeder implements ApplicationRunner {
         UUID icuId = UUID.fromString(DEMO_ICU_ID);
         PatientIdentifierTypeJpaEntity dniType = resolveDniType();
         List<DemoScenarios.Patient> patients = DemoScenarios.patients();
+        List<UUID> patientIds = new ArrayList<>();
         for (int i = 0; i < patients.size(); i++) {
             UUID patientId = seedPatient(patients.get(i), icuId, ctx.bedIds().get(i), dniType, i);
             seedEvaluations(patients.get(i), patientId, ctx);
+            patientIds.add(patientId);
+        }
+        seedAirwayEvents(ctx, patientIds);
+        seedWeaningTrials(ctx, patientIds);
+    }
+
+    /**
+     * Emits one INTUBATION airway event per demo patient at admission time so the
+     * event log is consistent with the seeded {@code INTUBATED} status. Without
+     * this the ventilator-days analytic (folded from the event log) reads zero
+     * despite the intubation census being non-zero.
+     */
+    private void seedAirwayEvents(DemoContext ctx, List<UUID> patientIds) {
+        OffsetDateTime intubatedAt = OffsetDateTime.now().minusDays(3);
+        for (UUID patientId : patientIds) {
+            jdbcClient.sql("""
+                    INSERT INTO airway_events (id, patient_id, shift_id, event_time, event_type, created_by)
+                    VALUES (:id, :patient, :shift, :time, 'INTUBATION', :createdBy)
+                    """)
+                    .param("id", UUID.randomUUID())
+                    .param("patient", patientId)
+                    .param("shift", ctx.shiftId())
+                    .param("time", intubatedAt)
+                    .param("createdBy", ctx.adminUserId())
+                    .update();
+        }
+    }
+
+    /**
+     * Seeds a spread of SBT attempt counts so the WIND weaning classification
+     * shows a realistic distribution: two Simple (1 attempt), two Difficult
+     * (2–3 attempts), one Prolonged (4 attempts) and one with no attempt yet.
+     */
+    private void seedWeaningTrials(DemoContext ctx, List<UUID> patientIds) {
+        // Failure count preceding the final SUCCESS, per patient index. An empty
+        // array leaves that patient with no SBT (WIND "Sin intento").
+        int[][] plan = { {1}, {1}, {0, 1}, {0, 0, 1}, {0, 0, 0, 1}, {} };
+        for (int i = 0; i < patientIds.size() && i < plan.length; i++) {
+            int[] outcomes = plan[i];
+            for (int a = 0; a < outcomes.length; a++) {
+                boolean success = outcomes[a] == 1;
+                jdbcClient.sql("""
+                        INSERT INTO spontaneous_breathing_trials
+                            (id, patient_id, shift_id, duration_minutes, outcome, created_by, created_at)
+                        VALUES (:id, :patient, :shift, :dur, :outcome, :createdBy, :recordedAt)
+                        """)
+                        .param("id", UUID.randomUUID())
+                        .param("patient", patientIds.get(i))
+                        .param("shift", ctx.shiftId())
+                        .param("dur", success ? 120 : 30)
+                        .param("outcome", success ? "SUCCESS" : "FAILURE")
+                        .param("createdBy", ctx.adminUserId())
+                        .param("recordedAt", OffsetDateTime.now().minusHours(12L * (outcomes.length - a)))
+                        .update();
+            }
         }
     }
 

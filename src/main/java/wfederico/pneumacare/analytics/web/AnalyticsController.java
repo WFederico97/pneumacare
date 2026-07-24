@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.analytics.application.AnalyticsService;
 import wfederico.pneumacare.analytics.web.dto.AnalyticsSummaryResponse;
@@ -24,11 +25,13 @@ public class AnalyticsController {
 
     @PreAuthorize("hasRole('THERAPIST')")
     @GetMapping("/summary")
-    public ApiResponseBase<AnalyticsSummaryResponse> summary(Authentication authentication) {
+    public ApiResponseBase<AnalyticsSummaryResponse> summary(
+            Authentication authentication,
+            @RequestParam(name = "windowDays", defaultValue = "14") int windowDays) {
         return ApiResponseBase.<AnalyticsSummaryResponse>builder()
                 .status(HttpStatus.OK.value())
                 .message("Resumen analítico")
-                .data(analyticsService.summarize(authentication))
+                .data(analyticsService.summarize(authentication, windowDays))
                 .traceId(MDC.get("traceId"))
                 .build();
     }

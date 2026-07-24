@@ -34,6 +34,7 @@ build/
 
 ### Environment ###
 .env
+.env.prod
 
 ### Secret / key material — never commit AES keys or certificates ###
 *.key

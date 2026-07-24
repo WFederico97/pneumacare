@@ -332,19 +332,10 @@ CREATE TABLE patient_consents (
 );
 
 -- ---------------------------------------------------------------------------
--- 13. Clinical Alerts Log
+-- 13. Clinical Alerts Log — owned by V16 (PNMC-100 schema: event_id/payload/status).
+--     An earlier design created it here; that table has been superseded and is
+--     created solely by V16 to match ClinicalAlertLogJpaEntity.
 -- ---------------------------------------------------------------------------
-
-CREATE TABLE clinical_alerts_log (
-    id              UUID        NOT NULL DEFAULT gen_random_uuid(),
-    evaluation_id   UUID        NOT NULL,
-    alert_type      VARCHAR(50) NOT NULL,
-    payload_sent    TEXT,
-    dispatched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    delivery_status VARCHAR(20),
-    CONSTRAINT pk_clinical_alerts_log      PRIMARY KEY (id),
-    CONSTRAINT fk_clinical_alerts_log_eval FOREIGN KEY (evaluation_id) REFERENCES evaluations (id)
-);
 
 -- ---------------------------------------------------------------------------
 -- 14. AI Clinical Insights
@@ -461,5 +452,4 @@ CREATE INDEX idx_sbt_patient                  ON spontaneous_breathing_trials (p
 CREATE INDEX idx_airway_assessments_patient   ON airway_assessments (patient_id);
 CREATE INDEX idx_airway_events_patient        ON airway_events (patient_id);
 CREATE INDEX idx_abg_patient                  ON arterial_blood_gases (patient_id);
-CREATE INDEX idx_clinical_alerts_evaluation   ON clinical_alerts_log (evaluation_id);
 CREATE INDEX idx_ai_insights_evaluation       ON ai_clinical_insights (evaluation_id);

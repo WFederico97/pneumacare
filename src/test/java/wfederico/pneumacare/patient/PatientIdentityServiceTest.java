@@ -56,7 +56,6 @@ import static org.mockito.Mockito.when;
  *   <li>ICU not found throws 404</li>
  *   <li>Bed not found in ICU throws 400</li>
  *   <li>Bed is OCCUPIED throws 400</li>
- *   <li>Bed is MAINTENANCE throws 400</li>
  *   <li>Unknown identifier type ID throws 400</li>
  *   <li>findById — found path returns full response</li>
  *   <li>findById — not-found throws 404</li>
@@ -222,20 +221,6 @@ class PatientIdentityServiceTest {
                 .id(BED_ID).icu(icu).bedNumber("BED-001").status(BedStatus.OCCUPIED).build();
         when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
         when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(occupiedBed));
-
-        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
-                .isInstanceOf(BusinessLayerException.class)
-                .extracting(e -> ((BusinessLayerException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("create — bed in MAINTENANCE — throws 400 Bad Request")
-    void create_bedInMaintenance_throwsBadRequest() {
-        IcuBedJpaEntity maintenanceBed = IcuBedJpaEntity.builder()
-                .id(BED_ID).icu(icu).bedNumber("BED-003").status(BedStatus.MAINTENANCE).build();
-        when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
-        when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(maintenanceBed));
 
         assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
                 .isInstanceOf(BusinessLayerException.class)

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
+import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -67,6 +68,17 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
 
     /** Count of patients admitted since the given instant (analytics ward). */
     long countByAdmissionDateAfter(OffsetDateTime since);
+
+    /** Admission timestamps of patients in a given clinical status (executive ALOS proxy). */
+    @Query("select p.admissionDate from PatientJpaEntity p where p.clinicalStatus = :status")
+    List<OffsetDateTime> findAdmissionDatesByClinicalStatus(ClinicalStatus status);
+
+    /** Count of patients currently in a given airway state (analytics ventilation). */
+    long countByRespiratoryStatus(RespiratoryStatus respiratoryStatus);
+
+    /** Ids of patients currently in a given airway state (analytics WIND cohort). */
+    @Query("select p.id from PatientJpaEntity p where p.respiratoryStatus = :status")
+    List<UUID> findIdsByRespiratoryStatus(RespiratoryStatus status);
 
     /**
      * All patients, newest admission first, with the full PII + bed/ICU graph

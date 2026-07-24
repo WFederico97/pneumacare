@@ -5,11 +5,14 @@ import wfederico.pneumacare.clinical.application.ClinicalMathEngine;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
+import wfederico.pneumacare.clinical.domain.VentilatorParameterField;
 import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.CstatResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.PafiResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.RsbiResult;
+
+import java.util.List;
 
 /**
  * Baseline TECME ventilator brand strategy.
@@ -46,5 +49,12 @@ public class TecmeStrategy implements VentilatorStrategy {
                 new PafiResult(pafi, PafiClassification.from(pafi)),
                 new CstatResult(cstat, CstatInterpretation.from(cstat))
         );
+    }
+
+    @Override
+    public List<VentilatorParameterField> extendedParameters() {
+        return List.of(
+                new VentilatorParameterField(
+                        "triggerFlow", "Trigger por flujo", "L/min", "number", 1, 30, 1, true));
     }
 }
