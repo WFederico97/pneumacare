@@ -35,6 +35,9 @@ build/
 ### Environment ###
 .env
 .env.prod
+# Same secrets, without the leading dot — this is the file compose actually
+# reads in this checkout, and it holds the AES key, JWT secret and admin password.
+env.prod
 
 ### Secret / key material — never commit AES keys or certificates ###
 *.key
