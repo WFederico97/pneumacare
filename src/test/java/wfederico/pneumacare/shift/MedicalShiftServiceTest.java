@@ -132,6 +132,7 @@ class MedicalShiftServiceTest {
                 .status(ShiftStatus.OPEN)
                 .build();
         when(shiftRepository.findById(SHIFT_ID)).thenReturn(Optional.of(open));
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
         when(shiftRepository.save(any(MedicalShiftJpaEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -153,12 +154,36 @@ class MedicalShiftServiceTest {
                 .status(ShiftStatus.CLOSED)
                 .build();
         when(shiftRepository.findById(SHIFT_ID)).thenReturn(Optional.of(closed));
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
 
         assertThatThrownBy(() -> service.close(SHIFT_ID))
                 .isInstanceOf(BusinessLayerException.class)
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.CONFLICT));
 
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("close_shiftInAnotherIcu_throws404AndDoesNotClose")
+    void close_shiftInAnotherIcu_throws404() {
+        UUID otherIcuId = UUID.fromString("dddddddd-0000-0000-0000-000000000009");
+        MedicalShiftJpaEntity foreignShift = MedicalShiftJpaEntity.builder()
+                .id(SHIFT_ID)
+                .icuId(otherIcuId)
+                .chiefUserId(CHIEF_ID)
+                .startTime(OffsetDateTime.now(ZoneOffset.UTC))
+                .status(ShiftStatus.OPEN)
+                .build();
+        when(shiftRepository.findById(SHIFT_ID)).thenReturn(Optional.of(foreignShift));
+        when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
+
+        assertThatThrownBy(() -> service.close(SHIFT_ID))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.NOT_FOUND));
+
+        assertThat(foreignShift.getStatus()).isEqualTo(ShiftStatus.OPEN);
         verify(shiftRepository, never()).save(any());
     }
 
