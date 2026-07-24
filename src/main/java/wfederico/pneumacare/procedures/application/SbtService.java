@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import wfederico.pneumacare.procedures.application.PatientLookupPort.PatientEpisodeView;
 import wfederico.pneumacare.procedures.infrastructure.persistence.SbtJpaEntity;
 import wfederico.pneumacare.procedures.infrastructure.persistence.SbtRepository;
 import wfederico.pneumacare.procedures.web.dto.CreateSbtRequest;
@@ -15,6 +16,7 @@ import wfederico.pneumacare.shared.security.CurrentUserPort;
 import java.util.List;
 import java.util.UUID;
 
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.EPISODE_CLOSED;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.NO_OPEN_SHIFT;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.PATIENT_NOT_FOUND;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.SBT_DURATION_NOT_POSITIVE;
@@ -43,6 +45,7 @@ public class SbtService {
      * <ol>
      *   <li>{@code durationMinutes} must be a positive integer — otherwise {@code 422}.</li>
      *   <li>Patient must exist — otherwise {@code 404}.</li>
+     *   <li>The episode must still be open (ADMITTED) — otherwise {@code 409}.</li>
      *   <li>The patient's ICU must have an OPEN shift (the trial is linked to it) —
      *       otherwise {@code 409}.</li>
      * </ol>
@@ -53,11 +56,15 @@ public class SbtService {
             throw new BusinessLayerException(SBT_DURATION_NOT_POSITIVE, HttpStatus.UNPROCESSABLE_CONTENT);
         }
 
-        UUID icuId = patientLookupPort.findIcuId(request.patientId())
+        PatientEpisodeView episode = patientLookupPort.findEpisode(request.patientId())
                 .orElseThrow(() -> new BusinessLayerException(
                         PATIENT_NOT_FOUND + request.patientId(), HttpStatus.NOT_FOUND));
 
-        UUID shiftId = activeShiftPort.findActiveShiftId(icuId)
+        if (!episode.episodeOpen()) {
+            throw new BusinessLayerException(EPISODE_CLOSED, HttpStatus.CONFLICT);
+        }
+
+        UUID shiftId = activeShiftPort.findActiveShiftId(episode.icuId())
                 .orElseThrow(() -> new BusinessLayerException(
                         NO_OPEN_SHIFT, HttpStatus.CONFLICT));
 
@@ -82,7 +89,7 @@ public class SbtService {
      */
     @Transactional(readOnly = true)
     public List<SbtResponse> getHistory(UUID patientId) {
-        if (patientLookupPort.findIcuId(patientId).isEmpty()) {
+        if (patientLookupPort.findEpisode(patientId).isEmpty()) {
             throw new BusinessLayerException(PATIENT_NOT_FOUND + patientId, HttpStatus.NOT_FOUND);
         }
         return sbtRepository.findByPatientIdOrderByCreatedAtDesc(patientId)

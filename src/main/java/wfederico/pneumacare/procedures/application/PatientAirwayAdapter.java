@@ -2,6 +2,7 @@ package wfederico.pneumacare.procedures.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientJpaEntity;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
@@ -28,7 +29,8 @@ public class PatientAirwayAdapter implements PatientAirwayPort {
                 .map(p -> new PatientAirwayView(
                         p.getId(),
                         p.getIcu().getId(),
-                        p.getRespiratoryStatus()));
+                        p.getRespiratoryStatus(),
+                        p.getClinicalStatus() == ClinicalStatus.ADMITTED));
     }
 
     @Override

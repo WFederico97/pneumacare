@@ -58,7 +58,7 @@ class AirwayEventServiceTest {
 
     private void givenPatient(RespiratoryStatus status) {
         when(patientAirwayPort.findAirwayView(PATIENT_ID))
-                .thenReturn(Optional.of(new PatientAirwayView(PATIENT_ID, ICU_ID, status)));
+                .thenReturn(Optional.of(new PatientAirwayView(PATIENT_ID, ICU_ID, status, true)));
     }
 
     private void givenOpenShift() {
@@ -162,6 +162,22 @@ class AirwayEventServiceTest {
     }
 
     @Test
+    @DisplayName("closed episode throws 409 before any shift lookup or write")
+    void register_closedEpisode_throws409AndWritesNothing() {
+        when(patientAirwayPort.findAirwayView(PATIENT_ID)).thenReturn(Optional.of(
+                new PatientAirwayView(PATIENT_ID, ICU_ID, RespiratoryStatus.SPONTANEOUS, false)));
+
+        assertThatThrownBy(() -> service.register(request(AirwayEventType.INTUBATION)))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        verify(activeShiftPort, never()).findActiveShiftId(any());
+        verify(airwayEventRepository, never()).save(any());
+        verify(patientAirwayPort, never()).applyRespiratoryStatus(any(), any());
+    }
+
+    @Test
     @DisplayName("illegal transition throws 409 and writes nothing, leaving status unchanged")
     void register_illegalTransition_throws409AndWritesNothing() {
         givenPatient(RespiratoryStatus.INTUBATED);
@@ -209,7 +225,7 @@ class AirwayEventServiceTest {
     @DisplayName("listing returns events mapped newest-first with derived resulting status")
     void getPatientAirwayEvents_returnsMappedEvents() {
         when(patientAirwayPort.findAirwayView(PATIENT_ID))
-                .thenReturn(Optional.of(new PatientAirwayView(PATIENT_ID, ICU_ID, RespiratoryStatus.INTUBATED)));
+                .thenReturn(Optional.of(new PatientAirwayView(PATIENT_ID, ICU_ID, RespiratoryStatus.INTUBATED, true)));
 
         AirwayEventJpaEntity intubation = AirwayEventJpaEntity.builder()
                 .id(EVENT_ID).patientId(PATIENT_ID).shiftId(SHIFT_ID)
