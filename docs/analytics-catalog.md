@@ -14,7 +14,7 @@ deliberately deferred until data volume demands it (see [Proposed](#proposed)).
 
 **Status legend:**
 - `live` — implemented and served today
-- `building` — this iteration (episode-terminus work, spec of 2026-07-24)
+- `building` — in progress
 - `proposed` — designed here, not yet scheduled
 
 ---
@@ -153,7 +153,7 @@ institutional quality, cost. Served by `GET /api/v1/analytics/dashboard`
 - **DTO:** `ExecutiveDashboardResponse.alertFrequencyLast7Days`
 - **Upgrade path:** per-shift heatmap (1.10) and SLA (2.9).
 
-### 2.5 True ALOS — `building`
+### 2.5 True ALOS — `live`
 
 - **Definition:** mean `discharge_date − admission_date` over episodes *closed
   in the window*. Replaces the current proxy (mean stay of currently-admitted
@@ -161,12 +161,12 @@ institutional quality, cost. Served by `GET /api/v1/analytics/dashboard`
 - **Variables:** `patients(admission_date, discharge_date)` — V29 terminus.
 - **UI:** stat tile with 30-day trend sparkline; census-mean tile beside it.
 
-### 2.6 Bed turnover — `building`
+### 2.6 Bed turnover — `live`
 
 - **Definition:** episodes closed in window ÷ total beds — throughput per bed.
 - **UI:** stat tile; monthly bar series once history accrues.
 
-### 2.7 ICU mortality & weaning-failure mortality — `building`
+### 2.7 ICU mortality & weaning-failure mortality — `live`
 
 - **Definition:** (`DECEASED` + `WITHDRAWAL_OF_CARE`) ÷ closed episodes, with
   withdrawal reported separately (conflating them distorts risk-adjusted
@@ -176,7 +176,7 @@ institutional quality, cost. Served by `GET /api/v1/analytics/dashboard`
 - **Variables:** `patients.disposition` × SBT results × airway-event folds.
 - **UI:** two stat tiles; weaning-failure cohort size shown as denominator.
 
-### 2.8 Readmission rate (48 h / 7 d) — `building`
+### 2.8 Readmission rate (48 h / 7 d) — `live`
 
 - **Definition:** episodes where the same `identity_id` is readmitted within
   N of the prior `discharge_date`. Standard discharge-quality indicator; early
