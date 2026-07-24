@@ -22,9 +22,10 @@ import java.util.UUID;
  * in as few queries as possible, avoiding N+1 problems when building the
  * admission response.
  *
- * <p>{@link #findByIdentity_Id(UUID)} is provided for idempotency checks:
- * the service can verify that no {@code patients} row already links to a given
- * {@code patient_identities} record before creating a new one.
+ * <p>{@link #findByIdentity_IdAndClinicalStatus(UUID, ClinicalStatus)} is the
+ * open-episode lookup: the service can verify that no OPEN {@code patients}
+ * row already links to a given {@code patient_identities} record before
+ * admitting a new episode (closed episodes are legitimate — readmission).
  */
 @Repository
 public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID> {
@@ -48,13 +49,16 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
     Optional<PatientJpaEntity> findById(UUID id);
 
     /**
-     * Looks up the operational patient record linked to a given PII identity.
-     * Used to prevent duplicate admissions for the same identity.
+     * Looks up a person's episode in the given clinical status. With
+     * {@code ADMITTED} this is the open-episode lookup (backed by the partial
+     * unique index {@code uq_patients_open_episode}), used to prevent a second
+     * concurrent admission of the same identity.
      *
      * @param identityId the UUID of the {@code patient_identities} record
-     * @return the patient linked to that identity, or empty if none exists
+     * @param status     the episode status to filter on
+     * @return the matching episode, or empty
      */
-    Optional<PatientJpaEntity> findByIdentity_Id(UUID identityId);
+    Optional<PatientJpaEntity> findByIdentity_IdAndClinicalStatus(UUID identityId, ClinicalStatus status);
 
     /**
      * Looks up the patient currently occupying the given bed with the given clinical status.
