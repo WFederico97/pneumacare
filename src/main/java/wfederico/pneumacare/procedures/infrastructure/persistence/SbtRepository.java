@@ -21,6 +21,11 @@ public interface SbtRepository extends JpaRepository<SbtJpaEntity, UUID> {
            "where s.createdAt >= :since group by s.patientId")
     List<PatientSbtCount> countAttemptsByPatientSince(OffsetDateTime since);
 
+    /** Patients with at least one failed SBT (weaning-failure cohort seed, executive analytics). */
+    @Query("select distinct s.patientId from SbtJpaEntity s "
+            + "where s.toleranceResult = wfederico.pneumacare.procedures.domain.ToleranceResult.FAILURE")
+    List<UUID> findPatientIdsWithFailedSbt();
+
     /** Projection for {@link #countAttemptsByPatientSince(OffsetDateTime)}. */
     interface PatientSbtCount {
         UUID getPatientId();

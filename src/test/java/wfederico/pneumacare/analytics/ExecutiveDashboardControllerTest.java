@@ -58,7 +58,9 @@ class ExecutiveDashboardControllerTest {
         when(service.dashboard()).thenReturn(new ExecutiveDashboardResponse(
                 50.0, 3L, 2L,
                 new ExecutiveDashboardResponse.AssetUtilization(3L, 5L, 2L, 30.0),
-                4.5));
+                4.5, 4.5, 0.5,
+                new ExecutiveDashboardResponse.MortalityStats(2L, 1L, 0L, 50.0, 1L, 1L, 100.0),
+                new ExecutiveDashboardResponse.ReadmissionStats(0L, 1L, 0.0, 50.0)));
     }
 
     @Test

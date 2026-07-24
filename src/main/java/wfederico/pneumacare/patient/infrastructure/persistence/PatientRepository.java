@@ -108,4 +108,28 @@ public interface PatientRepository extends JpaRepository<PatientJpaEntity, UUID>
      */
     @Query("select b.bedNumber from PatientJpaEntity p join p.bed b where p.id = :patientId")
     Optional<String> findBedLabelByPatientId(UUID patientId);
+
+    /**
+     * Closed episodes with a discharge in the window:
+     * {@code [id, admissionDate, dischargeDate, disposition]} per row.
+     * Feeds ALOS, turnover, mortality and readmission denominators.
+     */
+    @Query("select p.id, p.admissionDate, p.dischargeDate, p.disposition "
+            + "from PatientJpaEntity p where p.dischargeDate >= :since")
+    List<Object[]> findClosedEpisodeIntervals(OffsetDateTime since);
+
+    /**
+     * Readmission pairs: a later episode of the same identity admitted within
+     * {@code :hours} of a prior episode's discharge, prior discharge in window.
+     * Native SQL for the interval arithmetic.
+     */
+    @Query(value = """
+            SELECT count(*) FROM patients p2
+            JOIN patients p1 ON p1.identity_id = p2.identity_id AND p1.id <> p2.id
+            WHERE p1.discharge_date IS NOT NULL
+              AND p1.discharge_date >= :since
+              AND p2.admission_date > p1.discharge_date
+              AND p2.admission_date <= p1.discharge_date + make_interval(hours => :hours)
+            """, nativeQuery = true)
+    long countReadmissionsWithinHours(OffsetDateTime since, int hours);
 }
