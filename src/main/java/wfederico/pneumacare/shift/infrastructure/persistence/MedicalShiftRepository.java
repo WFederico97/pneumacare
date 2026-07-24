@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +17,7 @@ public interface MedicalShiftRepository extends JpaRepository<MedicalShiftJpaEnt
 
     /** Count of shifts started since the given instant (analytics ward). */
     long countByStartTimeAfter(OffsetDateTime since);
+
+    /** An ICU's shift history, newest first (shift history section). */
+    List<MedicalShiftJpaEntity> findByIcuIdOrderByStartTimeDesc(UUID icuId);
 }

@@ -15,8 +15,10 @@ import wfederico.pneumacare.shared.web.ApiResponseBase;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
+import wfederico.pneumacare.shift.web.dto.ShiftSummaryResponse;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -57,6 +59,22 @@ public class MedicalShiftController {
                         .traceId(MDC.get("traceId"))
                         .build()
         );
+    }
+
+    @Operation(
+            summary = "Shift history for the session ICU",
+            description = "Shifts of the caller's ICU, newest first, each with its duration and the "
+                    + "clinical activity recorded during it (handovers, evaluations, airway events, SBTs).")
+    @ApiResponse(responseCode = "200", description = "Shift history returned (possibly empty).")
+    @PreAuthorize("hasRole('THERAPIST')")
+    @GetMapping
+    public ResponseEntity<ApiResponseBase<List<ShiftSummaryResponse>>> history() {
+        return ResponseEntity.ok(ApiResponseBase.<List<ShiftSummaryResponse>>builder()
+                .status(HttpStatus.OK.value())
+                .message("Historial de turnos recuperado")
+                .data(service.history())
+                .traceId(MDC.get("traceId"))
+                .build());
     }
 
     @Operation(

@@ -31,4 +31,15 @@ public interface SbtRepository extends JpaRepository<SbtJpaEntity, UUID> {
         UUID getPatientId();
         long getTotal();
     }
+
+    /** SBT counts grouped by shift, for the shift-history activity summary. */
+    @Query("select x.shiftId as shiftId, count(x) as total from SbtJpaEntity x "
+            + "where x.shiftId in :shiftIds group by x.shiftId")
+    List<ShiftCount> countByShiftIds(java.util.Collection<java.util.UUID> shiftIds);
+
+    /** Projection for {@link #countByShiftIds}. */
+    interface ShiftCount {
+        java.util.UUID getShiftId();
+        long getTotal();
+    }
 }

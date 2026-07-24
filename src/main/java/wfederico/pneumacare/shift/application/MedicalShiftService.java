@@ -11,12 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
+import wfederico.pneumacare.shift.application.ShiftActivityPort.ShiftActivity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftJpaEntity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftRepository;
+import wfederico.pneumacare.shift.infrastructure.persistence.ShiftHandoverRepository;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
+import wfederico.pneumacare.shift.web.dto.ShiftSummaryResponse;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,9 +42,11 @@ import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.SH
 @RequiredArgsConstructor
 public class MedicalShiftService {
     private final MedicalShiftRepository shiftRepository;
+    private final ShiftHandoverRepository handoverRepository;
     private final IcuExistencePort icuExistencePort;
     private final CurrentUserPort currentUserPort;
     private final CurrentIcuPort currentIcuPort;
+    private final ShiftActivityPort shiftActivityPort;
 
     /**
      * Returns the active (OPEN) shift for the current context's ICU, if any.
@@ -48,6 +56,43 @@ public class MedicalShiftService {
         UUID icuId = currentIcuPort.currentIcuId();
         return shiftRepository.findByIcuIdAndStatus(icuId,ShiftStatus.OPEN)
                 .map(ShiftResponse::from);
+    }
+
+    /**
+     * The session ICU's shift history, newest first, each row carrying its
+     * duration and the clinical activity recorded during it.
+     *
+     * <p>Scoped to the session ICU for the same reason {@link #close(UUID)} is:
+     * a chief of guard has no business reading another unit's shift log.
+     */
+    @Transactional(readOnly = true)
+    public List<ShiftSummaryResponse> history() {
+        UUID icuId = currentIcuPort.currentIcuId();
+        List<MedicalShiftJpaEntity> shifts = shiftRepository.findByIcuIdOrderByStartTimeDesc(icuId);
+
+        List<UUID> shiftIds = shifts.stream().map(MedicalShiftJpaEntity::getId).toList();
+        Map<UUID, ShiftActivity> activity = shiftActivityPort.countByShiftIds(shiftIds);
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        return shifts.stream()
+                .map(shift -> {
+                    // An OPEN shift is still running, so measure it up to now.
+                    OffsetDateTime end = shift.getEndTime() == null ? now : shift.getEndTime();
+                    ShiftActivity counts = activity.getOrDefault(shift.getId(), ShiftActivity.NONE);
+                    return new ShiftSummaryResponse(
+                            shift.getId(),
+                            shift.getIcuId(),
+                            shift.getChiefUserId(),
+                            shift.getStatus(),
+                            shift.getStartTime(),
+                            shift.getEndTime(),
+                            Duration.between(shift.getStartTime(), end).toMinutes(),
+                            handoverRepository.countByShiftId(shift.getId()),
+                            counts.evaluations(),
+                            counts.airwayEvents(),
+                            counts.sbts());
+                })
+                .toList();
     }
 
     /**

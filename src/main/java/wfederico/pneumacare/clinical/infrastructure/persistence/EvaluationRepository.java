@@ -59,4 +59,15 @@ public interface EvaluationRepository extends JpaRepository<EvaluationJpaEntity,
         LocalDate getDay();
         long getTotal();
     }
+
+    /** Evaluation counts grouped by shift, for the shift-history activity summary. */
+    @Query("select e.shiftId as shiftId, count(e) as total from EvaluationJpaEntity e "
+            + "where e.shiftId in :shiftIds group by e.shiftId")
+    List<ShiftCount> countByShiftIds(java.util.Collection<java.util.UUID> shiftIds);
+
+    /** Projection for {@link #countByShiftIds}. */
+    interface ShiftCount {
+        java.util.UUID getShiftId();
+        long getTotal();
+    }
 }
