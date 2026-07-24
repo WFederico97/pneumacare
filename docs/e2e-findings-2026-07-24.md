@@ -14,9 +14,9 @@ Severity is about clinical and data risk, not effort.
 | 4 | **Medium** | New ventilators are filed in the wrong ICU | **Fixed** (5c25c4d) |
 | 5 | **Medium** | Ventilators can be assigned across ICUs | **Fixed** (5c25c4d) |
 | 6 | **Medium** | Ventilator inventory is not ICU-scoped | **Fixed** (5c25c4d) |
-| 7 | **Low** | Closed episodes still show clinical action buttons | Open |
-| 8 | **Low** | No password change for the signed-in user | Open |
-| 9 | **Low** | Stale success message persists next to a new error | Open |
+| 7 | **Low** | Closed episodes still show clinical action buttons | **Fixed** (8fca00b) |
+| 8 | **Low** | No password change for the signed-in user | **Fixed** (e40c0c1 / 8fca00b) |
+| 9 | **Low** | Stale success message persists next to a new error | **Fixed** (8fca00b) |
 
 Verified-correct behaviour is listed at the end — several things that looked like defects were deliberate and documented.
 
@@ -310,5 +310,24 @@ in its generic `Exception` handler. Harmless to clients but noisy for monitoring
 and it is why the finding-1 regression test asserts "no session issued" instead of
 a `404` status.
 
-Findings 7–9 (closed-episode buttons, no password change, stale success message)
-remain open.
+### Findings 7–9 (fixed 2026-07-24, `e40c0c1` / frontend `8fca00b`)
+
+| # | Check | Result |
+|---|---|---|
+| 7 | Discharged patient's history | no `Egresar` / `Asignar equipo` / `Agregar evento`; shows "Episodio cerrado: la historia clínica es de solo lectura." |
+| 7 | Admitted patient's history | all three controls still present |
+| 8 | Wrong current password | `403 "La contraseña actual es incorrecta"` |
+| 8 | New password under 8 chars | `400` with a per-field message |
+| 8 | New password same as current | `400 "La nueva contraseña debe ser distinta de la actual"` |
+| 8 | Full rotation | change → old password `401`, new password `200` → changed back |
+| 9 | Create a bed, then submit the same number | only the duplicate error shows; the success banner is cleared |
+
+437 backend unit tests pass. Demo dataset intact and the demo admin password
+restored to its original value.
+
+**Not addressed by finding 8:** a password change does not invalidate sessions
+already open on other devices — that needs token versioning (see finding 3's
+second option). The form says so explicitly.
+
+All nine findings are now closed. The one observation still open is that
+unmapped API paths return `500` rather than `404`.
