@@ -134,6 +134,34 @@ class AirwayEventServiceTest {
     }
 
     @Test
+    @DisplayName("decannulation from TRACHEOSTOMY returns the patient to SPONTANEOUS")
+    void register_validDecannulation_returnsToSpontaneous() {
+        givenPatient(RespiratoryStatus.TRACHEOSTOMY);
+        givenOpenShift();
+        when(currentUserPort.currentUserId()).thenReturn(CHIEF_ID);
+        echoSavedEvent();
+
+        AirwayEventResponse response = service.register(request(AirwayEventType.DECANNULATION));
+
+        assertThat(response.resultingStatus()).isEqualTo(RespiratoryStatus.SPONTANEOUS);
+        verify(patientAirwayPort).applyRespiratoryStatus(PATIENT_ID, RespiratoryStatus.SPONTANEOUS);
+    }
+
+    @Test
+    @DisplayName("decannulation is illegal from INTUBATED (only TRACHEOSTOMY may be decannulated)")
+    void register_decannulationFromIntubated_throws409() {
+        givenPatient(RespiratoryStatus.INTUBATED);
+        givenOpenShift();
+
+        assertThatThrownBy(() -> service.register(request(AirwayEventType.DECANNULATION)))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+        verify(airwayEventRepository, never()).save(any());
+        verify(patientAirwayPort, never()).applyRespiratoryStatus(any(), any());
+    }
+
+    @Test
     @DisplayName("illegal transition throws 409 and writes nothing, leaving status unchanged")
     void register_illegalTransition_throws409AndWritesNothing() {
         givenPatient(RespiratoryStatus.INTUBATED);
