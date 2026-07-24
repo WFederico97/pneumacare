@@ -27,6 +27,10 @@ import java.util.UUID;
  * 8 h by default) — so offboarding a clinician, or revoking a compromised
  * account, had no immediate effect.
  *
+ * <p>It also enforces the token generation: {@code token_version} in the token
+ * must match the stored column. Bumping that column (on password change) ends
+ * every session already issued, including ones on other devices.
+ *
  * <p>Cost is one primary-key lookup per authenticated request. It runs after the
  * resource server has authenticated the token, so unauthenticated and permitted
  * requests never touch the database.
@@ -80,13 +84,22 @@ public class ActiveAccountFilter extends OncePerRequestFilter {
             log.warn("Rejecting token: sub claim is not a UUID");
             return false;
         }
-        boolean active = userRepository.findById(userId)
-                .filter(UserJpaEntity::isEnabled)
-                .isPresent();
-        if (!active) {
+        UserJpaEntity user = userRepository.findById(userId).orElse(null);
+        if (user == null || !user.isEnabled()) {
             // Log the id only — never the display name or username.
             log.warn("Rejecting token for missing or disabled account: userId={}", userId);
+            return false;
         }
-        return active;
+
+        Object claim = jwt.getClaim("token_version");
+        // A token minted before token versioning existed carries no claim; treat it
+        // as stale rather than trusting it.
+        int tokenVersion = claim instanceof Number n ? n.intValue() : -1;
+        if (tokenVersion != user.getTokenVersion()) {
+            log.warn("Rejecting superseded token: userId={}, tokenVersion={}, expected={}",
+                    userId, tokenVersion, user.getTokenVersion());
+            return false;
+        }
+        return true;
     }
 }

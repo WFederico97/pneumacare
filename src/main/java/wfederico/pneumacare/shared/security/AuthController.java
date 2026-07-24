@@ -107,9 +107,9 @@ public class AuthController {
      * previously only an administrator could change someone else's password, and
      * the sole administrator could not change their own.
      *
-     * <p>A fresh cookie is issued so the caller stays signed in. Sessions already
-     * open elsewhere keep working until their token expires — revoking those needs
-     * token versioning, which is not implemented.
+     * <p>Bumps {@code token_version}, which invalidates every session issued
+     * before the change — including ones open on other devices — and then issues
+     * a fresh cookie so the caller themselves stays signed in.
      */
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/password")
@@ -131,10 +131,12 @@ public class AuthController {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        userRepository.save(user);
+        // Ends every session minted under the old password.
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        UserJpaEntity saved = userRepository.save(user);
 
-        // Re-issue the session so the caller is not silently logged out.
-        String token = jwtService.issueToken(UserPrincipal.from(user));
+        // Re-issue this session at the new generation so the caller is not logged out.
+        String token = jwtService.issueToken(UserPrincipal.from(saved));
         ResponseCookie jwtCookie =
                 buildCookie(jwtProperties.getCookieName(), token, true, jwtProperties.getExpiration());
 

@@ -21,16 +21,29 @@ public class UserPrincipal implements UserDetails {
     private final String passwordHash;
     private final String displayName;
     private final boolean enabled;
+    private final int tokenVersion;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public UserPrincipal(UUID id, String username, String passwordHash, String displayName,
                          boolean enabled, Collection<? extends GrantedAuthority> authorities) {
+        this(id, username, passwordHash, displayName, enabled, 0, authorities);
+    }
+
+    public UserPrincipal(UUID id, String username, String passwordHash, String displayName,
+                         boolean enabled, int tokenVersion,
+                         Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.username = username;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
         this.enabled = enabled;
+        this.tokenVersion = tokenVersion;
         this.authorities = authorities;
+    }
+
+    /** Session generation; embedded in the token and re-checked on every request. */
+    public int getTokenVersion() {
+        return tokenVersion;
     }
 
     public static UserPrincipal from(UserJpaEntity user) {
@@ -39,7 +52,7 @@ public class UserPrincipal implements UserDetails {
                 .toList();
         return new UserPrincipal(
                 user.getId(), user.getUsername(), user.getPasswordHash(),
-                user.getDisplayName(), user.isEnabled(), authorities);
+                user.getDisplayName(), user.isEnabled(), user.getTokenVersion(), authorities);
     }
 
     public UUID getId() {

@@ -49,6 +49,10 @@ public class JwtService {
                 .subject(principal.getId().toString())
                 .claim("roles", roles)
                 .claim("icu_id", defaultIcuId)
+                // Session generation. ActiveAccountFilter rejects the token when this
+                // no longer matches the stored value, so bumping it logs the user out
+                // everywhere.
+                .claim("token_version", principal.getTokenVersion())
                 .issuedAt(now)
                 .expiresAt(now.plus(properties.getExpiration()))
                 .build();

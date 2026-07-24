@@ -65,6 +65,16 @@ public class UserJpaEntity extends EntityBase {
     @Builder.Default
     private boolean enabled = true;
 
+    /**
+     * Bumped whenever every existing session for this user must stop working —
+     * currently on password change. Tokens carry it as a claim and are rejected
+     * when it no longer matches, which is what lets a password change end
+     * sessions on other devices.
+     */
+    @Column(name = "token_version", nullable = false)
+    @Builder.Default
+    private int tokenVersion = 0;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", nullable = false, length = 40)

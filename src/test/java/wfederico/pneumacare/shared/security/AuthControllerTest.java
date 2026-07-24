@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -225,6 +226,30 @@ class AuthControllerTest {
                 .andExpect(cookie().httpOnly("PNMC_AT", true));
 
         verify(userRepository).save(any());
+    }
+
+    @Test
+    @WithMockUser
+    void changePassword_bumpsTokenVersionSoOtherSessionsStop() throws Exception {
+        UUID id = UUID.randomUUID();
+        wfederico.pneumacare.shared.security.user.UserJpaEntity user = storedUser(id);
+        user.setTokenVersion(3);
+        when(userRepository.findById(any(UUID.class))).thenReturn(java.util.Optional.of(user));
+        when(passwordEncoder.matches(eq("current123"), anyString())).thenReturn(true);
+        when(passwordEncoder.matches(eq("brandnew123"), anyString())).thenReturn(false);
+        when(passwordEncoder.encode("brandnew123")).thenReturn("$2a$10$newhash");
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.issueToken(any(UserPrincipal.class))).thenReturn("fresh.jwt.token");
+
+        mockMvc.perform(post("/api/v1/auth/password")
+                        .with(csrf())
+                        .with(authentication(principalAuth(id)))
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"current123\",\"newPassword\":\"brandnew123\"}"))
+                .andExpect(status().isOk());
+
+        // Every token minted at version 3 is now stale.
+        assertThat(user.getTokenVersion()).isEqualTo(4);
     }
 
     /** An authentication whose name is the user's UUID, as the JWT sub claim would be. */
