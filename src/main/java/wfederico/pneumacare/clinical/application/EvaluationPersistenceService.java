@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import wfederico.pneumacare.clinical.application.EvaluationContextPort.PatientEpisode;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorStrategy;
 import wfederico.pneumacare.clinical.domain.MetricBreach;
@@ -25,6 +26,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
+
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.EPISODE_CLOSED;
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.NO_OPEN_SHIFT;
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.PATIENT_NOT_FOUND;
 
 /**
  * Application service for evaluation persistence.
@@ -72,6 +77,7 @@ public class EvaluationPersistenceService {
     private final VentilatorFactory ventilatorFactory;
     private final ApplicationEventPublisher eventPublisher;
     private final PatientBedLabelPort patientBedLabelPort;
+    private final EvaluationContextPort evaluationContextPort;
 
     /**
      * Persists a new evaluation record with auto-computed clinical index snapshots.
@@ -88,9 +94,22 @@ public class EvaluationPersistenceService {
     public EvaluationResponse create(CreateEvaluationRequest request) {
         UUID createdBy = resolveCreatedBy();
 
-        log.debug("Evaluation creation started: patientId={}, shiftId={}, ventilatorId={}, brand={}",
-                request.patientId(), request.shiftId(),
-                request.physicalVentilatorId(), request.brand());
+        log.debug("Evaluation creation started: patientId={}, ventilatorId={}, brand={}",
+                request.patientId(), request.physicalVentilatorId(), request.brand());
+
+        // Patient, episode state and shift are resolved server-side: a client-supplied
+        // shiftId could attach the reading to a closed shift or another ICU's shift.
+        PatientEpisode episode = evaluationContextPort.findEpisode(request.patientId())
+                .orElseThrow(() -> new BusinessLayerException(
+                        PATIENT_NOT_FOUND + request.patientId(), HttpStatus.NOT_FOUND));
+
+        if (!episode.episodeOpen()) {
+            throw new BusinessLayerException(EPISODE_CLOSED, HttpStatus.CONFLICT);
+        }
+
+        UUID shiftId = evaluationContextPort.findActiveShiftId(episode.icuId())
+                .orElseThrow(() -> new BusinessLayerException(
+                        NO_OPEN_SHIFT, HttpStatus.CONFLICT));
 
         VentilatorReading reading = new VentilatorReading(
                 request.f().doubleValue(),
@@ -114,7 +133,7 @@ public class EvaluationPersistenceService {
 
         EvaluationJpaEntity entity = EvaluationJpaEntity.builder()
                 .patientId(request.patientId())
-                .shiftId(request.shiftId())
+                .shiftId(shiftId)
                 .physicalVentilatorId(request.physicalVentilatorId())
                 .f(request.f())
                 .vt(request.vt())

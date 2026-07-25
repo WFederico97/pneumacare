@@ -19,6 +19,7 @@ import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationReposi
 import wfederico.pneumacare.patient.domain.BedStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedRepository;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
+import wfederico.pneumacare.procedures.infrastructure.persistence.AirwayEventRepository;
 import wfederico.pneumacare.procedures.infrastructure.persistence.SbtRepository;
 import wfederico.pneumacare.shared.security.SecurityConfig;
 import wfederico.pneumacare.shared.security.user.UserRepository;
@@ -54,6 +55,7 @@ class AnalyticsControllerTest {
     @MockitoBean private MedicalShiftRepository shifts;
     @MockitoBean private PatientRepository patients;
     @MockitoBean private UserRepository users;
+    @MockitoBean private AirwayEventRepository airwayEvents;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -71,6 +73,9 @@ class AnalyticsControllerTest {
         when(users.count()).thenReturn(4L);
         when(users.countByEnabled(anyBoolean())).thenReturn(4L);
         when(users.countByRole()).thenReturn(List.of());
+        when(patients.findIdsByRespiratoryStatus(any())).thenReturn(List.of());
+        when(sbts.countAttemptsByPatientSince(any())).thenReturn(List.of());
+        when(airwayEvents.findAllByOrderByPatientIdAscEventTimeAsc()).thenReturn(List.of());
     }
 
     @Test

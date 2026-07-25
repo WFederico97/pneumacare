@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import wfederico.pneumacare.shared.security.ProblemSupport;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
@@ -72,6 +73,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(ProblemSupport.body(status, detail, request.getRequestURI()));
+    }
+
+    /**
+     * Unmapped paths. Without this they fall through to the generic {@link Exception}
+     * handler and are reported as {@code 500}, which makes a simple typo in a URL
+     * look like a server fault and buries real errors in monitoring.
+     *
+     * <p>Logged at DEBUG: an unknown path is a client mistake, not an incident.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponseBase<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("No handler for path: {}", ex.getResourcePath());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponseBase.<Void>builder()
+                        .status(HttpStatus.NOT_FOUND.value())
+                        .message("Recurso no encontrado")
+                        .traceId(MDC.get("traceId"))
+                        .build());
     }
 
     @ExceptionHandler(Exception.class)

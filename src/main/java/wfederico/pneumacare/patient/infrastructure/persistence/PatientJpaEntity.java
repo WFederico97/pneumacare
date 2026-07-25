@@ -10,7 +10,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,6 +19,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
+import wfederico.pneumacare.patient.domain.Disposition;
 import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 
 import java.time.OffsetDateTime;
@@ -36,10 +36,12 @@ import java.util.UUID;
  * data-subject requests.
  *
  * <h2>Relationship to PatientIdentityJpaEntity</h2>
- * The association is a {@code @OneToOne} with {@code UNIQUE} on the FK column,
- * mirroring the {@code uq_patients_identity} constraint declared in Flyway V1.
- * Only the operational side ({@code patients}) holds the FK column
- * ({@code identity_id}); the PII side is unaware of this association.
+ * Since Flyway V29 the {@code patients} row is one ICU <em>episode</em>: a
+ * person ({@code patient_identities}) may have many episodes over time
+ * (readmission), with at most one open — enforced by the partial unique index
+ * {@code uq_patients_open_episode}. The association is therefore a
+ * {@code @ManyToOne}; only the operational side holds the FK column
+ * ({@code identity_id}) and the PII side is unaware of this association.
  *
  * <h2>Bed assignment</h2>
  * {@code bed} is nullable per the V1 schema ({@code bed_id UUID}) — a patient
@@ -78,13 +80,14 @@ public class PatientJpaEntity {
     private IcuJpaEntity icu;
 
     /**
-     * Link to the PII identity record.
-     * {@code unique = true} mirrors {@code uq_patients_identity} in Flyway V1.
+     * Link to the PII identity record. {@code @ManyToOne} since V29: a person
+     * may have multiple episodes (readmission); at most one open, enforced by
+     * the partial unique index {@code uq_patients_open_episode}.
      * Excluded from {@code toString()} to prevent lazy-proxy resolution in logs.
      */
     @ToString.Exclude
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "identity_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "identity_id", nullable = false)
     private PatientIdentityJpaEntity identity;
 
     /**
@@ -124,4 +127,20 @@ public class PatientJpaEntity {
     @CreationTimestamp
     @Column(name = "admission_date", nullable = false, updatable = false)
     private OffsetDateTime admissionDate;
+
+    /**
+     * Timestamp at which this episode closed. Null while the episode is open;
+     * paired with {@link #disposition} by the {@code chk_patients_terminus}
+     * DB constraint (Flyway V29).
+     */
+    @Column(name = "discharge_date")
+    private OffsetDateTime dischargeDate;
+
+    /**
+     * Clinical disposition of the closed episode. Null while open — see
+     * {@link #dischargeDate}. Stored as {@code VARCHAR(50)} per Flyway V29.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "disposition", length = 50)
+    private Disposition disposition;
 }

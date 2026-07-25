@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import wfederico.pneumacare.procedures.application.AirwayEventService;
 import wfederico.pneumacare.procedures.web.dto.AirwayEventResponse;
+import wfederico.pneumacare.procedures.web.dto.AirwayTransitionResponse;
 import wfederico.pneumacare.procedures.web.dto.CreateAirwayEventRequest;
 import wfederico.pneumacare.shared.constants.RequestMessageConstants;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
@@ -70,6 +71,23 @@ public class AirwayEventController {
                         .data(data)
                         .traceId(MDC.get("traceId"))
                         .build());
+    }
+
+    @Operation(
+            summary = "List the legal airway transitions",
+            description = "Publishes the airway state machine (event type, required current status, "
+                    + "resulting status, display label) so clients render transitions from the server "
+                    + "instead of hardcoding their own copy.")
+    @ApiResponse(responseCode = "200", description = "The complete transition table.")
+    @PreAuthorize("hasRole('THERAPIST')")
+    @GetMapping("/procedures/airway/transitions")
+    public ResponseEntity<ApiResponseBase<List<AirwayTransitionResponse>>> airwayTransitions() {
+        return ResponseEntity.ok(ApiResponseBase.<List<AirwayTransitionResponse>>builder()
+                .status(HttpStatus.OK.value())
+                .message("Transiciones de vía aérea recuperadas")
+                .data(AirwayTransitionResponse.all())
+                .traceId(MDC.get("traceId"))
+                .build());
     }
 
     @Operation(

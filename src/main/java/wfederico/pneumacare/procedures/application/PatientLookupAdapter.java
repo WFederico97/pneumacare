@@ -2,6 +2,7 @@ package wfederico.pneumacare.procedures.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.PatientRepository;
 
 import java.util.Optional;
@@ -17,8 +18,10 @@ public class PatientLookupAdapter implements PatientLookupPort {
     private final PatientRepository patientRepository;
 
     @Override
-    public Optional<UUID> findIcuId(UUID patientId) {
+    public Optional<PatientEpisodeView> findEpisode(UUID patientId) {
         return patientRepository.findById(patientId)
-                .map(p -> p.getIcu().getId());
+                .map(p -> new PatientEpisodeView(
+                        p.getIcu().getId(),
+                        p.getClinicalStatus() == ClinicalStatus.ADMITTED));
     }
 }

@@ -136,8 +136,8 @@ public class EvaluationController {
     public ResponseEntity<ApiResponseBase<EvaluationResponse>> createEvaluation(
             @Valid @RequestBody CreateEvaluationRequest request) {
 
-        log.debug("Evaluation admission requested: patientId={}, shiftId={}, ventilatorId={}",
-                request.patientId(), request.shiftId(), request.physicalVentilatorId());
+        log.debug("Evaluation admission requested: patientId={}, ventilatorId={}",
+                request.patientId(), request.physicalVentilatorId());
 
         EvaluationResponse data = service.create(request);
 

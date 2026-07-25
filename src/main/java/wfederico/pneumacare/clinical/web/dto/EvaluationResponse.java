@@ -2,6 +2,7 @@ package wfederico.pneumacare.clinical.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 import wfederico.pneumacare.clinical.infrastructure.persistence.EvaluationJpaEntity;
@@ -79,6 +80,14 @@ public record EvaluationResponse(
         @Schema(description = "Static lung compliance interpretation.")
         CstatInterpretation cstatInterpretation,
 
+        @Schema(description = "Static driving pressure \u2014 \u0394P = Pplat\u2212PEEP (cmH\u2082O). "
+                + "Derived; \u0394P > 15 is associated with increased ARDS mortality.",
+                example = "20.00")
+        BigDecimal drivingPressure,
+
+        @Schema(description = "Driving-pressure band (PROTECTIVE \u2264 15 cmH\u2082O, HIGH otherwise).")
+        DrivingPressureBand drivingPressureBand,
+
         @Schema(description = "True if any clinical threshold was breached.")
         boolean alertTriggered,
 
@@ -93,6 +102,10 @@ public record EvaluationResponse(
      * @return fully-populated response record
      */
     public static EvaluationResponse from(EvaluationJpaEntity entity) {
+
+        // ΔP is pure arithmetic on two stored, immutable columns (Pplat − PEEP),
+        // so it is derived on read rather than persisted as a snapshot.
+        BigDecimal drivingPressure = entity.getPplat().subtract(entity.getPeep());
 
         return new EvaluationResponse(
                 entity.getId(),
@@ -112,6 +125,8 @@ public record EvaluationResponse(
                 entity.getPafiClassification(),
                 entity.getCstatSnapshot(),
                 entity.getCstatInterpretation(),
+                drivingPressure,
+                DrivingPressureBand.from(drivingPressure.doubleValue()),
                 entity.isAlertTriggered(),
                 entity.getCreatedBy());
     }

@@ -9,11 +9,9 @@ package wfederico.pneumacare.patient.domain;
  * <ul>
  *   <li>{@link #AVAILABLE} — the bed is empty and can accept a new admission.</li>
  *   <li>{@link #OCCUPIED}  — a patient is currently assigned to this bed.</li>
- *   <li>{@link #MAINTENANCE} — the bed is temporarily out of service.</li>
  * </ul>
  */
 public enum BedStatus {
     AVAILABLE,
-    OCCUPIED,
-    MAINTENANCE
+    OCCUPIED
 }

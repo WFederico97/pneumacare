@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import wfederico.pneumacare.clinical.application.EvaluationPersistenceService;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
+import wfederico.pneumacare.clinical.domain.DrivingPressureBand;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
 import wfederico.pneumacare.clinical.web.EvaluationController;
@@ -133,6 +134,8 @@ class EvaluationControllerTest {
                 PafiClassification.MILD_ARDS,
                 new BigDecimal("25.00"),
                 CstatInterpretation.LOW,
+                new BigDecimal("20"),
+                DrivingPressureBand.HIGH,
                 false,
                 CREATED_BY);
 
@@ -177,6 +180,8 @@ class EvaluationControllerTest {
                 PafiClassification.MILD_ARDS,
                 new BigDecimal("25.00"),
                 CstatInterpretation.LOW,
+                new BigDecimal("20"),
+                DrivingPressureBand.HIGH,
                 false,
                 CREATED_BY);
 

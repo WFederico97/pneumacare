@@ -22,6 +22,7 @@ import wfederico.pneumacare.patient.web.dto.CreatePatientRequest;
 import wfederico.pneumacare.patient.web.dto.PatientResponse;
 import wfederico.pneumacare.shared.constants.ExceptionMessageConstants;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 
 import java.util.UUID;
 
@@ -64,6 +65,7 @@ public class PatientIdentityService {
     private final PatientRepository patientRepository;
     private final IcuRepository icuRepository;
     private final IcuBedRepository icuBedRepository;
+    private final CurrentIcuPort currentIcuPort;
 
     // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -76,16 +78,21 @@ public class PatientIdentityService {
      *
      * @param request plain-text admission data (validated by {@code @Valid} at the HTTP boundary)
      * @return the admission response with plain-text PII and the operational {@code patientId}
+     * <p>The ICU is derived server-side from the session ({@link CurrentIcuPort}),
+     * never taken from the request: a client-supplied ICU that disagreed with the
+     * bed's own ICU made every admission fail with "bed not found in ICU".
+     *
      * @throws BusinessLayerException with {@code 404} if the ICU or bed is not found
-     * @throws BusinessLayerException with {@code 400} if the bed is not in the given ICU,
+     * @throws BusinessLayerException with {@code 400} if the bed is not in the session's ICU,
      *         the bed is not AVAILABLE, or the identifier type ID is unknown
      */
     @Transactional
     public PatientResponse create(CreatePatientRequest request) {
-        log.debug("Patient admission started: icuId={}, bedId={}", request.icuId(), request.bedId());
+        UUID icuId = currentIcuPort.currentIcuId();
+        log.debug("Patient admission started: icuId={}, bedId={}", icuId, request.bedId());
 
-        IcuJpaEntity icu = resolveIcu(request.icuId());
-        IcuBedJpaEntity bed = resolveAndOccupyBed(request.icuId(), request.bedId());
+        IcuJpaEntity icu = resolveIcu(icuId);
+        IcuBedJpaEntity bed = resolveAndOccupyBed(icuId, request.bedId());
 
         PatientIdentityJpaEntity identity = buildAndSaveIdentity(request);
 

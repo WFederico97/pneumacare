@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.procedures.application.ActiveShiftPort;
 import wfederico.pneumacare.procedures.application.PatientLookupPort;
+import wfederico.pneumacare.procedures.application.PatientLookupPort.PatientEpisodeView;
 import wfederico.pneumacare.procedures.application.SbtService;
 import wfederico.pneumacare.procedures.domain.ToleranceResult;
 import wfederico.pneumacare.procedures.infrastructure.persistence.SbtJpaEntity;
@@ -66,7 +67,7 @@ class SbtServiceTest {
     @Test
     @DisplayName("successful trial persists the SBT and returns it")
     void register_success_persists() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.of(ICU_ID));
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.of(new PatientEpisodeView(ICU_ID, true)));
         when(activeShiftPort.findActiveShiftId(ICU_ID)).thenReturn(Optional.of(SHIFT_ID));
         when(currentUserPort.currentUserId()).thenReturn(CHIEF_ID);
         echoSavedSbt();
@@ -87,9 +88,24 @@ class SbtServiceTest {
     }
 
     @Test
+    @DisplayName("closed episode throws 409 before any shift lookup or write")
+    void register_closedEpisode_throws409AndWritesNothing() {
+        when(patientLookupPort.findEpisode(PATIENT_ID))
+                .thenReturn(Optional.of(new PatientEpisodeView(ICU_ID, false)));
+
+        assertThatThrownBy(() -> service.register(request(30, ToleranceResult.SUCCESS)))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+
+        verify(activeShiftPort, never()).findActiveShiftId(any());
+        verify(sbtRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("failure outcome is a valid recorded trial and persists")
     void register_failure_persists() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.of(ICU_ID));
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.of(new PatientEpisodeView(ICU_ID, true)));
         when(activeShiftPort.findActiveShiftId(ICU_ID)).thenReturn(Optional.of(SHIFT_ID));
         when(currentUserPort.currentUserId()).thenReturn(CHIEF_ID);
         echoSavedSbt();
@@ -108,7 +124,7 @@ class SbtServiceTest {
                 .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT));
 
-        verify(patientLookupPort, never()).findIcuId(any());
+        verify(patientLookupPort, never()).findEpisode(any());
         verify(sbtRepository, never()).save(any());
     }
 
@@ -126,7 +142,7 @@ class SbtServiceTest {
     @Test
     @DisplayName("unknown patient throws 404 and never checks the shift")
     void register_unknownPatient_throws404() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.empty());
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.register(request(30, ToleranceResult.SUCCESS)))
                 .isInstanceOf(BusinessLayerException.class)
@@ -140,7 +156,7 @@ class SbtServiceTest {
     @Test
     @DisplayName("no OPEN shift for the patient's ICU throws 409 and writes nothing")
     void register_noOpenShift_throws409() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.of(ICU_ID));
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.of(new PatientEpisodeView(ICU_ID, true)));
         when(activeShiftPort.findActiveShiftId(ICU_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.register(request(30, ToleranceResult.SUCCESS)))
@@ -154,7 +170,7 @@ class SbtServiceTest {
     @Test
     @DisplayName("history returns the patient's trials mapped newest-first")
     void getHistory_returnsMappedTrials() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.of(ICU_ID));
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.of(new PatientEpisodeView(ICU_ID, true)));
         SbtJpaEntity sbt = SbtJpaEntity.builder()
                 .id(SBT_ID).patientId(PATIENT_ID).shiftId(SHIFT_ID)
                 .durationMinutes(30).toleranceResult(ToleranceResult.SUCCESS).createdBy(CHIEF_ID)
@@ -171,7 +187,7 @@ class SbtServiceTest {
     @Test
     @DisplayName("history for an unknown patient throws 404")
     void getHistory_unknownPatient_throws404() {
-        when(patientLookupPort.findIcuId(PATIENT_ID)).thenReturn(Optional.empty());
+        when(patientLookupPort.findEpisode(PATIENT_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getHistory(PATIENT_ID))
                 .isInstanceOf(BusinessLayerException.class)

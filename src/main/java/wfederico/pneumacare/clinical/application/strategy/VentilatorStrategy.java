@@ -1,7 +1,10 @@
 package wfederico.pneumacare.clinical.application.strategy;
 
+import wfederico.pneumacare.clinical.domain.VentilatorParameterField;
 import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
+
+import java.util.List;
 
 /**
  * Strategy contract for brand-specific ventilator data adapters.
@@ -34,4 +37,15 @@ public interface VentilatorStrategy {
      *         (e.g., plateau pressure &le; PEEP total)
      */
     VentilatorEvaluationResult evaluate(VentilatorReading reading);
+
+    /**
+     * The brand-specific extended parameters this ventilator exposes beyond the
+     * six universal fields (f, Vt, FiO₂, PaO₂, PEEP, Pplat). Drives the dynamic
+     * section of the evaluation form. Defaults to none.
+     *
+     * @return ordered field descriptors; empty when the brand adds no extra inputs
+     */
+    default List<VentilatorParameterField> extendedParameters() {
+        return List.of();
+    }
 }

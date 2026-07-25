@@ -22,7 +22,10 @@ import wfederico.pneumacare.patient.web.dto.IcuBedResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Application service that provides ICU bed data for the dashboard endpoint.
@@ -43,6 +46,7 @@ public class IcuBedService {
     private final IcuBedRepository icuBedRepository;
     private final IcuRepository icuRepository;
     private final PatientRepository patientRepository;
+    private final BedAlertStatusPort bedAlertStatusPort;
     private final Environment environment;
 
     @Value("${app.security.dev-default-icu-id:cccccccc-0000-0000-0000-000000000001}")
@@ -58,7 +62,8 @@ public class IcuBedService {
     public List<IcuBedResponse> findBedsForAuthenticatedIcu() {
         UUID icuId = extractIcuIdFromAuthentication();
 
-        return icuBedRepository.findByIcu_IdAndStatusInOrderByBedNumberAsc(icuId, DASHBOARD_STATUSES)
+        List<BedWithPatient> resolved = icuBedRepository
+                .findByIcu_IdAndStatusInOrderByBedNumberAsc(icuId, DASHBOARD_STATUSES)
                 .stream()
                 .map(bed -> {
                     UUID patientId = null;
@@ -68,9 +73,29 @@ public class IcuBedService {
                                 .map(PatientJpaEntity::getId)
                                 .orElse(null);
                     }
-                    return IcuBedResponse.from(bed, patientId);
+                    return new BedWithPatient(bed, patientId);
                 })
                 .toList();
+
+        Set<UUID> occupyingPatientIds = resolved.stream()
+                .map(BedWithPatient::patientId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<UUID> alertedPatientIds = occupyingPatientIds.isEmpty()
+                ? Set.of()
+                : bedAlertStatusPort.patientsWithActiveAlert(occupyingPatientIds);
+
+        return resolved.stream()
+                .map(bp -> IcuBedResponse.from(
+                        bp.bed(),
+                        bp.patientId(),
+                        bp.patientId() != null && alertedPatientIds.contains(bp.patientId())))
+                .toList();
+    }
+
+    /** Intermediate pairing of a bed with the UUID of its occupying patient (null when unoccupied). */
+    private record BedWithPatient(IcuBedJpaEntity bed, UUID patientId) {
     }
 
     public IcuBedResponse create(CreateIcuBedRequest request) {

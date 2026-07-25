@@ -8,10 +8,17 @@ import wfederico.pneumacare.patient.domain.RespiratoryStatus;
  * {@code requiredCurrentStatus -> resultingStatus}:
  *
  * <ul>
- *   <li>{@link #INTUBATION}:   SPONTANEOUS &rarr; INTUBATED</li>
- *   <li>{@link #EXTUBATION}:   INTUBATED   &rarr; SPONTANEOUS</li>
- *   <li>{@link #TRACHEOSTOMY}: INTUBATED   &rarr; TRACHEOSTOMY</li>
+ *   <li>{@link #INTUBATION}:    SPONTANEOUS  &rarr; INTUBATED</li>
+ *   <li>{@link #EXTUBATION}:    INTUBATED    &rarr; SPONTANEOUS</li>
+ *   <li>{@link #TRACHEOSTOMY}:  INTUBATED    &rarr; TRACHEOSTOMY</li>
+ *   <li>{@link #DECANNULATION}: TRACHEOSTOMY &rarr; SPONTANEOUS</li>
  * </ul>
+ *
+ * <p>{@code DECANNULATION} is what keeps {@code TRACHEOSTOMY} from being a
+ * terminal state: without it a tracheostomised patient could never return to a
+ * natural airway, and so could never be discharged home or to the ward (the
+ * discharge airway guard rejects those dispositions while an artificial airway
+ * is in place).
  *
  * <p>Any event applied to a patient who is not in the required status
  * (e.g. intubating an already-intubated patient, extubating a spontaneous one)
@@ -22,7 +29,8 @@ import wfederico.pneumacare.patient.domain.RespiratoryStatus;
 public enum AirwayEventType {
     INTUBATION(RespiratoryStatus.SPONTANEOUS, RespiratoryStatus.INTUBATED),
     EXTUBATION(RespiratoryStatus.INTUBATED, RespiratoryStatus.SPONTANEOUS),
-    TRACHEOSTOMY(RespiratoryStatus.INTUBATED, RespiratoryStatus.TRACHEOSTOMY);
+    TRACHEOSTOMY(RespiratoryStatus.INTUBATED, RespiratoryStatus.TRACHEOSTOMY),
+    DECANNULATION(RespiratoryStatus.TRACHEOSTOMY, RespiratoryStatus.SPONTANEOUS);
 
     private final RespiratoryStatus requiredCurrentStatus;
     private final RespiratoryStatus resultingStatus;
