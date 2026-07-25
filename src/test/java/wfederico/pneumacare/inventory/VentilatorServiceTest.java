@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.inventory.application.VentilatorService;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.inventory.domain.VentilatorBrand;
 import wfederico.pneumacare.inventory.domain.VentilatorStatus;
 import wfederico.pneumacare.inventory.infrastructure.persistence.PhysicalVentilatorJpaEntity;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +50,9 @@ class VentilatorServiceTest {
 
     @Mock
     private VentilatorModelRepository modelRepository;
+
+    @Mock
+    private CurrentIcuPort currentIcuPort;
 
     @InjectMocks
     private VentilatorService service;
@@ -69,10 +74,14 @@ class VentilatorServiceTest {
                 .serialNumber("SN-001")
                 .status(VentilatorStatus.AVAILABLE)
                 .build();
+
+        // Every path resolves the session ICU; lenient so tests that fail before
+        // reaching it do not trip strict stubbing.
+        lenient().when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
     }
 
     private CreateVentilatorRequest validRequest() {
-        return new CreateVentilatorRequest("SN-001", VentilatorBrand.TECME, "GraphNet TS+", ICU_ID);
+        return new CreateVentilatorRequest("SN-001", VentilatorBrand.TECME, "GraphNet TS+");
     }
 
     @Test
@@ -151,29 +160,18 @@ class VentilatorServiceTest {
     }
 
     @Test
-    @DisplayName("list: without ICU filter delegates to findAll")
-    void listWithoutFilter() {
-        Pageable pageable = PageRequest.of(0, 10);
-        when(ventilatorRepository.findAll(pageable))
-                .thenReturn(new PageImpl<>(List.of(ventilator), pageable, 1));
-
-        PageResponse<VentilatorResponse> page = service.list(pageable, null);
-
-        assertThat(page.content()).hasSize(1);
-        assertThat(page.totalElements()).isEqualTo(1);
-        assertThat(page.content().get(0).serialNumber()).isEqualTo("SN-001");
-    }
-
-    @Test
-    @DisplayName("list: with ICU filter delegates to findByIcuId")
-    void listWithIcuFilter() {
+    @DisplayName("list: always scoped to the session ICU, never an unscoped findAll")
+    void listIsScopedToSessionIcu() {
         Pageable pageable = PageRequest.of(0, 10);
         when(ventilatorRepository.findByIcuId(ICU_ID, pageable))
                 .thenReturn(new PageImpl<>(List.of(ventilator), pageable, 1));
 
-        PageResponse<VentilatorResponse> page = service.list(pageable, ICU_ID);
+        PageResponse<VentilatorResponse> page = service.list(pageable);
 
         assertThat(page.content()).hasSize(1);
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.content().get(0).serialNumber()).isEqualTo("SN-001");
+        // An unscoped listing would expose other units' equipment.
         verify(ventilatorRepository, never()).findAll(pageable);
     }
 

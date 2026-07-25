@@ -1,6 +1,7 @@
 package wfederico.pneumacare.procedures.infrastructure.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import wfederico.pneumacare.procedures.domain.ToleranceResult;
 
 import java.time.OffsetDateTime;
@@ -14,4 +15,31 @@ public interface SbtRepository extends JpaRepository<SbtJpaEntity, UUID> {
 
     /** Count of SBTs with a given outcome since the given instant (analytics weaning). */
     long countByToleranceResultAndCreatedAtAfter(ToleranceResult toleranceResult, OffsetDateTime since);
+
+    /** Per-patient SBT attempt counts since the given instant (WIND classification). */
+    @Query("select s.patientId as patientId, count(s) as total from SbtJpaEntity s " +
+           "where s.createdAt >= :since group by s.patientId")
+    List<PatientSbtCount> countAttemptsByPatientSince(OffsetDateTime since);
+
+    /** Patients with at least one failed SBT (weaning-failure cohort seed, executive analytics). */
+    @Query("select distinct s.patientId from SbtJpaEntity s "
+            + "where s.toleranceResult = wfederico.pneumacare.procedures.domain.ToleranceResult.FAILURE")
+    List<UUID> findPatientIdsWithFailedSbt();
+
+    /** Projection for {@link #countAttemptsByPatientSince(OffsetDateTime)}. */
+    interface PatientSbtCount {
+        UUID getPatientId();
+        long getTotal();
+    }
+
+    /** SBT counts grouped by shift, for the shift-history activity summary. */
+    @Query("select x.shiftId as shiftId, count(x) as total from SbtJpaEntity x "
+            + "where x.shiftId in :shiftIds group by x.shiftId")
+    List<ShiftCount> countByShiftIds(java.util.Collection<java.util.UUID> shiftIds);
+
+    /** Projection for {@link #countByShiftIds}. */
+    interface ShiftCount {
+        java.util.UUID getShiftId();
+        long getTotal();
+    }
 }

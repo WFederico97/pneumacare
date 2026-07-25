@@ -14,6 +14,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.context.SecurityContextHolder;
+import wfederico.pneumacare.clinical.application.EvaluationContextPort;
+import wfederico.pneumacare.clinical.application.EvaluationContextPort.PatientEpisode;
 import wfederico.pneumacare.clinical.application.EvaluationPersistenceService;
 import wfederico.pneumacare.clinical.application.PatientBedLabelPort;
 import wfederico.pneumacare.clinical.application.strategy.VentilatorFactory;
@@ -79,6 +81,7 @@ class EvaluationPersistenceServiceTest {
 
     private static final UUID PATIENT_ID    = UUID.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
     private static final UUID SHIFT_ID      = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000001");
+    private static final UUID ICU_ID        = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final UUID VENTILATOR_ID = UUID.fromString("cccccccc-0000-0000-0000-000000000001");
     private static final UUID THERAPIST_ID  = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
     private static final UUID NIL_UUID      = new UUID(0L, 0L);
@@ -110,6 +113,9 @@ class EvaluationPersistenceServiceTest {
     @Mock
     private PatientBedLabelPort patientBedLabelPort;
 
+    @Mock
+    private EvaluationContextPort evaluationContextPort;
+
     @InjectMocks
     private EvaluationPersistenceService service;
 
@@ -120,7 +126,6 @@ class EvaluationPersistenceServiceTest {
     void setUp() {
         validRequest = new CreateEvaluationRequest(
                 PATIENT_ID,
-                SHIFT_ID,
                 VENTILATOR_ID,
                 VentilatorBrand.TECME,
                 new BigDecimal("15"),
@@ -130,6 +135,13 @@ class EvaluationPersistenceServiceTest {
                 new BigDecimal("25"),
                 new BigDecimal("5"),
                 null);
+
+        // Patient/shift are resolved server-side now; lenient so tests asserting
+        // validation failures before these calls do not trip strict stubbing.
+        lenient().when(evaluationContextPort.findEpisode(PATIENT_ID))
+                .thenReturn(Optional.of(new PatientEpisode(ICU_ID, true)));
+        lenient().when(evaluationContextPort.findActiveShiftId(ICU_ID))
+                .thenReturn(Optional.of(SHIFT_ID));
 
         // Factory routes any brand to the mock strategy by default; specific tests override
         // when they care about the brand argument.
@@ -240,7 +252,7 @@ class EvaluationPersistenceServiceTest {
     @DisplayName("create_neumoventBrand_resolvesNeumoventStrategy")
     void create_neumoventBrand_factoryResolvedByBrand() {
         CreateEvaluationRequest neumoventRequest = new CreateEvaluationRequest(
-                PATIENT_ID, SHIFT_ID, VENTILATOR_ID,
+                PATIENT_ID, VENTILATOR_ID,
                 VentilatorBrand.NEUMOVENT,
                 new BigDecimal("15"),
                 new BigDecimal("500"),
@@ -412,6 +424,58 @@ class EvaluationPersistenceServiceTest {
 
         PatientRiskEvent event = (PatientRiskEvent) captor.getValue();
         assertThat(event.bedLabel()).isNull();
+    }
+
+    @Test
+    @DisplayName("create_unknownPatient_throws404AndPersistsNothing")
+    void create_unknownPatient_throws404() {
+        setTherapistAuth();
+        when(evaluationContextPort.findEpisode(PATIENT_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(validRequest))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.NOT_FOUND));
+        verify(evaluationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create_closedEpisode_throws409AndPersistsNothing")
+    void create_closedEpisode_throws409() {
+        setTherapistAuth();
+        when(evaluationContextPort.findEpisode(PATIENT_ID))
+                .thenReturn(Optional.of(new PatientEpisode(ICU_ID, false)));
+
+        assertThatThrownBy(() -> service.create(validRequest))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+        verify(evaluationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create_noOpenShift_throws409AndPersistsNothing")
+    void create_noOpenShift_throws409() {
+        setTherapistAuth();
+        when(evaluationContextPort.findActiveShiftId(ICU_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.create(validRequest))
+                .isInstanceOf(BusinessLayerException.class)
+                .satisfies(ex -> assertThat(((BusinessLayerException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
+        verify(evaluationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("create_persistsServerResolvedShift_notAnyClientValue")
+    void create_persistsServerResolvedShift() {
+        setTherapistAuth();
+
+        service.create(validRequest);
+
+        ArgumentCaptor<EvaluationJpaEntity> captor = ArgumentCaptor.forClass(EvaluationJpaEntity.class);
+        verify(evaluationRepository).save(captor.capture());
+        assertThat(captor.getValue().getShiftId()).isEqualTo(SHIFT_ID);
     }
 
     // ── Private helpers ──────────────────────────────────────────────────

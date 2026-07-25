@@ -17,6 +17,7 @@ import wfederico.pneumacare.inventory.web.dto.CreateVentilatorRequest;
 import wfederico.pneumacare.inventory.web.dto.UpdateVentilatorStatusRequest;
 import wfederico.pneumacare.inventory.web.dto.VentilatorResponse;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.shared.web.dto.PageResponse;
 
 import java.util.UUID;
@@ -35,12 +36,21 @@ public class VentilatorService {
 
     private final PhysicalVentilatorRepository ventilatorRepository;
     private final VentilatorModelRepository modelRepository;
+    private final CurrentIcuPort currentIcuPort;
 
+    /**
+     * Registers a ventilator in the caller's ICU.
+     *
+     * <p>The ICU comes from the session, never the request: a client-supplied ICU
+     * filed new equipment into whichever unit the client happened to name, so
+     * ventilators registered from one ICU's screen ended up owned by another.
+     */
     @Transactional
     public VentilatorResponse create(CreateVentilatorRequest request) {
-        if (!ventilatorRepository.icuExists(request.icuId())) {
+        UUID icuId = currentIcuPort.currentIcuId();
+        if (!ventilatorRepository.icuExists(icuId)) {
             throw new BusinessLayerException(
-                    "No se encontró la UCI con id: " + request.icuId(), HttpStatus.NOT_FOUND);
+                    "No se encontró la UCI con id: " + icuId, HttpStatus.NOT_FOUND);
         }
 
         String serialNumber = request.serialNumber().trim();
@@ -57,7 +67,7 @@ public class VentilatorService {
                         .build()));
 
         PhysicalVentilatorJpaEntity ventilator = PhysicalVentilatorJpaEntity.builder()
-                .icuId(request.icuId())
+                .icuId(icuId)
                 .model(model)
                 .serialNumber(serialNumber)
                 .status(VentilatorStatus.AVAILABLE)
@@ -74,11 +84,15 @@ public class VentilatorService {
         }
     }
 
+    /**
+     * The caller's ICU inventory. Always scoped to the session ICU — an
+     * unscoped listing exposed other units' equipment and made misfiled
+     * ventilators look usable.
+     */
     @Transactional(readOnly = true)
-    public PageResponse<VentilatorResponse> list(Pageable pageable, UUID icuId) {
-        Page<PhysicalVentilatorJpaEntity> page = (icuId == null)
-                ? ventilatorRepository.findAll(pageable)
-                : ventilatorRepository.findByIcuId(icuId, pageable);
+    public PageResponse<VentilatorResponse> list(Pageable pageable) {
+        Page<PhysicalVentilatorJpaEntity> page =
+                ventilatorRepository.findByIcuId(currentIcuPort.currentIcuId(), pageable);
         return PageResponse.from(page, VentilatorResponse::from);
     }
 
@@ -110,8 +124,17 @@ public class VentilatorService {
         }
     }
 
+    /**
+     * Loads a ventilator belonging to the caller's ICU.
+     *
+     * <p>One from another ICU is reported as {@code 404} rather than {@code 403},
+     * so the endpoint does not confirm the existence of equipment the caller may
+     * not act on — the same convention used when closing a shift.
+     */
     private PhysicalVentilatorJpaEntity findOrThrow(UUID id) {
+        UUID icuId = currentIcuPort.currentIcuId();
         return ventilatorRepository.findById(id)
+                .filter(v -> v.getIcuId().equals(icuId))
                 .orElseThrow(() -> new BusinessLayerException(
                         "No se encontró el ventilador con id: " + id, HttpStatus.NOT_FOUND));
     }

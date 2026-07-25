@@ -74,7 +74,7 @@ class VentilatorCrudIntegrationTest {
     @DisplayName("create, read, update status and delete a ventilator end to end")
     void fullCrudRoundTrip() {
         VentilatorResponse created = service.create(new CreateVentilatorRequest(
-                "IT-SN-001", VentilatorBrand.TECME, "GraphNet TS+", IcuTestDataSeeder.ICU_ID));
+                "IT-SN-001", VentilatorBrand.TECME, "GraphNet TS+"));
         assertThat(created.id()).isNotNull();
         assertThat(created.createdAt()).isNotNull();
         assertThat(created.status()).isEqualTo(VentilatorStatus.AVAILABLE);
@@ -94,10 +94,10 @@ class VentilatorCrudIntegrationTest {
     @DisplayName("duplicate serial number is rejected against the real unique constraint")
     void duplicateSerialAgainstRealConstraint() {
         service.create(new CreateVentilatorRequest(
-                "IT-SN-002", VentilatorBrand.NEUMOVENT, "GraphNet Neo", IcuTestDataSeeder.ICU_ID));
+                "IT-SN-002", VentilatorBrand.NEUMOVENT, "GraphNet Neo"));
 
         assertThatThrownBy(() -> service.create(new CreateVentilatorRequest(
-                "IT-SN-002", VentilatorBrand.NEUMOVENT, "GraphNet Neo", IcuTestDataSeeder.ICU_ID)))
+                "IT-SN-002", VentilatorBrand.NEUMOVENT, "GraphNet Neo")))
                 .isInstanceOf(BusinessLayerException.class);
     }
 }

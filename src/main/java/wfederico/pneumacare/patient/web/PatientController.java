@@ -22,8 +22,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import wfederico.pneumacare.patient.application.PatientDischargeService;
 import wfederico.pneumacare.patient.application.PatientIdentityService;
 import wfederico.pneumacare.patient.web.dto.CreatePatientRequest;
+import wfederico.pneumacare.patient.web.dto.DischargePatientRequest;
 import wfederico.pneumacare.patient.web.dto.PatientResponse;
 import wfederico.pneumacare.shared.web.ApiResponseBase;
 
@@ -49,6 +51,7 @@ import java.util.UUID;
 public class PatientController {
 
     private final PatientIdentityService service;
+    private final PatientDischargeService dischargeService;
 
     @Operation(
             summary = "Admit a new patient",
@@ -148,7 +151,7 @@ public class PatientController {
     public ResponseEntity<ApiResponseBase<PatientResponse>> createPatient(
             @Valid @RequestBody CreatePatientRequest request) {
 
-        log.debug("Patient admission requested: icuId={}, bedId={}", request.icuId(), request.bedId());
+        log.debug("Patient admission requested: bedId={}", request.bedId());
         PatientResponse data = service.create(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -158,6 +161,23 @@ public class PatientController {
                         .data(data)
                         .traceId(MDC.get("traceId"))
                         .build());
+    }
+
+    @Operation(
+            summary = "Discharge a patient (close the episode)",
+            description = "Sets discharge date + disposition, frees the bed and releases any "
+                    + "assigned ventilator. Required role: ROLE_THERAPIST.")
+    @PreAuthorize("hasRole('THERAPIST')")
+    @PostMapping("/{id}/discharge")
+    public ApiResponseBase<Void> discharge(
+            @PathVariable UUID id,
+            @Valid @RequestBody DischargePatientRequest request) {
+        dischargeService.discharge(id, request.disposition(), request.dischargeDate());
+        return ApiResponseBase.<Void>builder()
+                .status(HttpStatus.OK.value())
+                .message("Paciente egresado")
+                .traceId(MDC.get("traceId"))
+                .build();
     }
 
     @Operation(

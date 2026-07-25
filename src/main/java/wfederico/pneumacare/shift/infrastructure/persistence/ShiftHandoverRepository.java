@@ -9,4 +9,7 @@ public interface ShiftHandoverRepository extends JpaRepository<ShiftHandoverJpaE
 
     /** Handover notes for a shift, newest first (by created_at). */
     List<ShiftHandoverJpaEntity> findByShiftIdOrderByCreatedAtDesc(UUID shiftId);
+
+    /** Number of handover notes on a shift (shift-history summary). */
+    long countByShiftId(UUID shiftId);
 }

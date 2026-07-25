@@ -20,7 +20,8 @@ class JwtServiceTest {
 
     private final JwtProperties props = props();
     private final SecretKey key = props.getSecretKey();
-    private final JwtService service = new JwtService(new NimbusJwtEncoder(new ImmutableSecret<>(key)), props);
+    private static final String ICU_ID = "cccccccc-0000-0000-0000-000000000001";
+    private final JwtService service = new JwtService(new NimbusJwtEncoder(new ImmutableSecret<>(key)), props, ICU_ID);
     private final JwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
 
     private static JwtProperties props() {
@@ -42,6 +43,7 @@ class JwtServiceTest {
 
         assertThat(decoded.getSubject()).isEqualTo(id.toString());
         assertThat(decoded.getClaimAsStringList("roles")).containsExactly("ROLE_THERAPIST");
+        assertThat(decoded.getClaimAsString("icu_id")).isEqualTo(ICU_ID);
         assertThat(decoded.getIssuedAt()).isNotNull();
         assertThat(decoded.getExpiresAt()).isNotNull();
         assertThat(Duration.between(decoded.getIssuedAt(), decoded.getExpiresAt()))

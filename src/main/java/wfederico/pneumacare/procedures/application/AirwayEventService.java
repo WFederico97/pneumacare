@@ -18,6 +18,7 @@ import wfederico.pneumacare.shared.security.CurrentUserPort;
 import java.util.List;
 import java.util.UUID;
 
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.EPISODE_CLOSED;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.ILLEGAL_AIRWAY_TRANSITION;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.NO_OPEN_SHIFT;
 import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.PATIENT_NOT_FOUND;
@@ -45,6 +46,7 @@ public class AirwayEventService {
      *
      * <ol>
      *   <li>Patient must exist — otherwise {@code 404}.</li>
+     *   <li>The episode must still be open (ADMITTED) — otherwise {@code 409}.</li>
      *   <li>The patient's ICU must have an OPEN shift — otherwise {@code 409}.</li>
      *   <li>The event must be a legal transition from the current status — otherwise
      *       {@code 409}, with nothing written and the status unchanged.</li>
@@ -55,6 +57,10 @@ public class AirwayEventService {
         PatientAirwayView patient = patientAirwayPort.findAirwayView(request.patientId())
                 .orElseThrow(() -> new BusinessLayerException(
                         PATIENT_NOT_FOUND + request.patientId(), HttpStatus.NOT_FOUND));
+
+        if (!patient.episodeOpen()) {
+            throw new BusinessLayerException(EPISODE_CLOSED, HttpStatus.CONFLICT);
+        }
 
         UUID shiftId = activeShiftPort.findActiveShiftId(patient.icuId())
                 .orElseThrow(() -> new BusinessLayerException(

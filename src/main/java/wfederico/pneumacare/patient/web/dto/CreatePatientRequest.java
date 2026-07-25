@@ -24,9 +24,11 @@ import java.util.UUID;
  * layer — the value is stored and encrypted as-is.
  *
  * <h2>Bed assignment</h2>
- * The caller must supply both {@code icuId} and {@code bedId}. The service
- * validates that the bed belongs to the given ICU and is currently
- * {@code AVAILABLE} before creating the admission record.
+ * The caller supplies only {@code bedId}. The ICU is derived server-side from
+ * the session, and the service validates that the bed belongs to it and is
+ * currently {@code AVAILABLE} before creating the admission record. There is
+ * deliberately no {@code icuId} field: when the client supplied one it could
+ * disagree with the bed's real ICU, which made every admission fail.
  */
 @Schema(description = "Request payload for admitting a patient. " +
         "PII fields (firstName, lastName, identifier value) are stored " +
@@ -68,15 +70,8 @@ public record CreatePatientRequest(
         PatientIdentifierRequest identifier,
 
         @Schema(
-                description = "UUID of the Intensive Care Unit where the patient is being admitted. " +
-                        "Obtain valid IDs from GET /api/v1/icus.",
-                example = "cccccccc-0000-0000-0000-000000000001")
-        @NotNull(message = "ICU ID is required")
-        UUID icuId,
-
-        @Schema(
                 description = "UUID of the bed to assign to this patient. " +
-                        "The bed must belong to the given icuId and have status AVAILABLE.",
+                        "The bed must belong to the session's ICU and have status AVAILABLE.",
                 example = "dddddddd-0000-0000-0000-000000000001")
         @NotNull(message = "Bed ID is required")
         UUID bedId) {

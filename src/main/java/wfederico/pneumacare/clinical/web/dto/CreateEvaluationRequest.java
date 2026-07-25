@@ -46,9 +46,13 @@ import java.util.UUID;
  * the clean 400 response with a per-field error map.
  *
  * <h2>Cross-context references</h2>
- * {@code patientId}, {@code shiftId}, and {@code physicalVentilatorId} are UUIDs
- * that reference records in other bounded contexts. Their existence is enforced by
- * database FK constraints; no JPA-level validation is performed.
+ * {@code patientId} and {@code physicalVentilatorId} are UUIDs that reference
+ * records in other bounded contexts. The patient is validated by the service
+ * (existence + open episode); ventilator existence is enforced by a database FK.
+ *
+ * <p>There is deliberately <strong>no {@code shiftId}</strong>: the shift is
+ * resolved server-side from the patient's ICU, so a reading can never be
+ * attributed to a closed shift or to another ICU's shift.
  */
 @Schema(description = "Ventilator reading payload for evaluation persistence. " +
         "All clinical indices (RSBI, PaFi, Cstat) are computed server-side via the " +
@@ -59,11 +63,6 @@ public record CreateEvaluationRequest(
                 example = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
         @NotNull(message = "El ID del paciente es obligatorio")
         UUID patientId,
-
-        @Schema(description = "UUID of the active medical shift.",
-                example = "bbbbbbbb-0000-0000-0000-000000000001")
-        @NotNull(message = "El ID del turno es obligatorio")
-        UUID shiftId,
 
         @Schema(description = "UUID of the physical ventilator used for this reading.",
                 example = "cccccccc-0000-0000-0000-000000000001")

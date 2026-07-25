@@ -19,6 +19,14 @@ public interface PatientAirwayPort {
     /** Persists the patient's new respiratory status. */
     void applyRespiratoryStatus(UUID patientId, RespiratoryStatus newStatus);
 
-    /** Minimal read model for airway-event processing. */
-    record PatientAirwayView(UUID patientId, UUID icuId, RespiratoryStatus respiratoryStatus) {}
+    /**
+     * Minimal read model for airway-event processing.
+     *
+     * @param episodeOpen {@code true} while the episode is ADMITTED. A closed
+     *                    episode (discharged / transferred / deceased) still
+     *                    exists and is readable, but must not accept new
+     *                    clinical writes.
+     */
+    record PatientAirwayView(UUID patientId, UUID icuId, RespiratoryStatus respiratoryStatus,
+                             boolean episodeOpen) {}
 }

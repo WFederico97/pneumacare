@@ -56,6 +56,13 @@ public final class ExceptionMessageConstants {
     public static final String NO_OPEN_SHIFT =
             "No hay un turno abierto para la UCI del paciente";
 
+    /**
+     * The patient's episode is closed (discharged / transferred / deceased), so no
+     * further clinical data may be recorded against it.
+     */
+    public static final String EPISODE_CLOSED =
+            "El episodio del paciente está cerrado: no se pueden registrar datos clínicos";
+
     /** The requested airway transition is not allowed from the patient's current state. */
     public static final String ILLEGAL_AIRWAY_TRANSITION =
             "Transición de vía aérea no permitida";

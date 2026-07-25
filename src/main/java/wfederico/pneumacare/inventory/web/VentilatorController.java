@@ -33,8 +33,8 @@ import java.util.UUID;
 /**
  * REST controller for physical ventilator inventory management.
  *
- * <p>Writes are restricted to administrators; reads are open to all clinical
- * staff so ventilators can be selected during evaluations.
+ * <p>Writes are restricted to administrators and chiefs of guard; reads are
+ * open to all clinical staff so ventilators can be selected during evaluations.
  */
 @Tag(name = "Ventilators", description = "Physical ventilator inventory management")
 @Slf4j
@@ -50,7 +50,7 @@ public class VentilatorController {
     @Operation(summary = "Register a physical ventilator",
             description = "Registers a ventilator with a unique serial number. "
                     + "Duplicate serials are rejected with 409 Conflict.")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','CHIEF_OF_GUARD')")
     @PostMapping
     public ResponseEntity<ApiResponseBase<VentilatorResponse>> create(
             @Valid @RequestBody CreateVentilatorRequest request) {
@@ -60,18 +60,17 @@ public class VentilatorController {
     }
 
     @Operation(summary = "List ventilators (paginated)",
-            description = "Pages the ventilator inventory, optionally filtered by ICU.")
+            description = "Pages the ventilator inventory of the caller's ICU.")
     @PreAuthorize("hasAnyRole('ADMIN','CHIEF_OF_GUARD','THERAPIST')")
     @GetMapping
     public ResponseEntity<ApiResponseBase<PageResponse<VentilatorResponse>>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) UUID icuId) {
+            @RequestParam(defaultValue = "20") int size) {
         PageRequest pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
                 Sort.by("serialNumber").ascending());
-        PageResponse<VentilatorResponse> data = service.list(pageable, icuId);
+        PageResponse<VentilatorResponse> data = service.list(pageable);
         return ResponseEntity.ok(
                 envelope(HttpStatus.OK, RequestMessageConstants.VENTILATORS_RETRIEVED, data));
     }
@@ -87,7 +86,7 @@ public class VentilatorController {
 
     @Operation(summary = "Update a ventilator's status",
             description = "Status-only partial update (AVAILABLE / IN_USE / MAINTENANCE).")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','CHIEF_OF_GUARD')")
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponseBase<VentilatorResponse>> updateStatus(
             @PathVariable UUID id,
@@ -100,7 +99,7 @@ public class VentilatorController {
     @Operation(summary = "Delete a ventilator",
             description = "Hard delete. Ventilators referenced by clinical history "
                     + "cannot be deleted (409) — set them to MAINTENANCE instead.")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','CHIEF_OF_GUARD')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);

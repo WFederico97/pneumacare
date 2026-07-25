@@ -45,7 +45,7 @@ import java.util.UUID;
  * <ul>
  *   <li>{@code BED-001} — {@code AVAILABLE} (happy-path admission test target)</li>
  *   <li>{@code BED-002} — {@code AVAILABLE} (secondary available bed)</li>
- *   <li>{@code BED-003} — {@code MAINTENANCE} (used by "bed not available" test)</li>
+ *   <li>{@code BED-003} — {@code AVAILABLE}</li>
  * </ul>
  */
 @Slf4j
@@ -193,7 +193,7 @@ public class IcuTestDataSeeder implements ApplicationRunner {
                      " VALUES (?, ?, ?, ?) ON CONFLICT (id) DO NOTHING";
         jdbcTemplate.update(sql, BED_001_ID, ICU_ID, "BED-001", "AVAILABLE");
         jdbcTemplate.update(sql, BED_002_ID, ICU_ID, "BED-002", "AVAILABLE");
-        jdbcTemplate.update(sql, BED_003_ID, ICU_ID, "BED-003", "MAINTENANCE");
+        jdbcTemplate.update(sql, BED_003_ID, ICU_ID, "BED-003", "AVAILABLE");
     }
 
     /**

@@ -22,6 +22,7 @@ import wfederico.pneumacare.shared.exception.BusinessLayerException;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.EPISODE_CLOSED;
 /**
  * Assigns and releases physical ventilators to/from patients.
  *
@@ -47,9 +48,21 @@ public class AssetAssignmentService {
                         "No se encontró el ventilador con id: " + request.ventilatorId(),
                         HttpStatus.NOT_FOUND));
 
-        if (!assignmentRepository.patientExists(request.patientId())) {
+        AssetAssignmentRepository.PatientEpisodeRow episode =
+                assignmentRepository.findPatientEpisode(request.patientId())
+                        .orElseThrow(() -> new BusinessLayerException(
+                                "No se encontró el paciente con id: " + request.patientId(),
+                                HttpStatus.NOT_FOUND));
+
+        // Equipment stays within its unit: assigning across ICUs corrupts every
+        // per-ICU utilisation figure and hides misfiled equipment.
+        if (!ventilator.getIcuId().equals(episode.getIcuId())) {
             throw new BusinessLayerException(
-                    "No se encontró el paciente con id: " + request.patientId(), HttpStatus.NOT_FOUND);
+                    "El ventilador pertenece a otra UCI", HttpStatus.CONFLICT);
+        }
+
+        if (!episode.getEpisodeOpen()) {
+            throw new BusinessLayerException(EPISODE_CLOSED, HttpStatus.CONFLICT);
         }
 
         if (ventilator.getStatus() != VentilatorStatus.AVAILABLE) {
@@ -101,6 +114,26 @@ public class AssetAssignmentService {
         AssetAssignmentJpaEntity saved = assignmentRepository.save(assignment);
         ventilatorRepository.save(ventilator);
         return AssetAssignmentResponse.from(saved, ventilator.getStatus());
+    }
+
+    /**
+     * Releases the patient's active ventilator assignment, if any, returning
+     * the ventilator to the AVAILABLE pool. No-op when nothing is assigned —
+     * discharge must not fail because the patient had no ventilator.
+     * Invoked inside the discharge transaction (PatientDischargeService).
+     */
+    @Transactional
+    public void releaseForPatient(UUID patientId) {
+        assignmentRepository.findByPatientIdAndReleasedAtIsNull(patientId).ifPresent(assignment -> {
+            assignment.setReleasedAt(OffsetDateTime.now());
+            assignmentRepository.save(assignment);
+            ventilatorRepository.findById(assignment.getVentilatorId()).ifPresent(ventilator -> {
+                ventilator.setStatus(VentilatorStatus.AVAILABLE);
+                ventilatorRepository.save(ventilator);
+            });
+            log.info("Released ventilator assignment on discharge: patientId={}, ventilatorId={}",
+                    patientId, assignment.getVentilatorId());
+        });
     }
 
     /**

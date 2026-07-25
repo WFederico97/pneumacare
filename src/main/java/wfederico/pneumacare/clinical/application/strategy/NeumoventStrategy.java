@@ -5,11 +5,14 @@ import wfederico.pneumacare.clinical.application.ClinicalMathEngine;
 import wfederico.pneumacare.clinical.domain.CstatInterpretation;
 import wfederico.pneumacare.clinical.domain.PafiClassification;
 import wfederico.pneumacare.clinical.domain.RsbiInterpretation;
+import wfederico.pneumacare.clinical.domain.VentilatorParameterField;
 import wfederico.pneumacare.clinical.domain.input.VentilatorReading;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.CstatResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.PafiResult;
 import wfederico.pneumacare.clinical.domain.output.VentilatorEvaluationResult.RsbiResult;
+
+import java.util.List;
 
 /**
  * Neumovent ventilator brand strategy.
@@ -69,5 +72,12 @@ public class NeumoventStrategy implements VentilatorStrategy {
                 new PafiResult(pafi, PafiClassification.from(pafi)),
                 new CstatResult(cstat, CstatInterpretation.from(cstat))
         );
+    }
+
+    @Override
+    public List<VentilatorParameterField> extendedParameters() {
+        return List.of(
+                new VentilatorParameterField(
+                        "inspTime", "Tiempo inspiratorio", "s", "number", 0.1, 5, 0.1, true));
     }
 }

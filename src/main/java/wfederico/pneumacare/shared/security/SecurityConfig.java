@@ -26,6 +26,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -40,6 +41,7 @@ import wfederico.pneumacare.shared.security.bootstrap.BootstrapAdminProperties;
 
 import javax.crypto.SecretKey;
 import java.util.List;
+import wfederico.pneumacare.shared.security.user.UserRepository;
 
 @Configuration
 @EnableWebSecurity
@@ -98,19 +100,22 @@ public class SecurityConfig {
                                                    JwtAuthenticationConverter jwtAuthenticationConverter,
                                                    BearerTokenResolver cookieBearerTokenResolver,
                                                    AccessDeniedHandler problemAccessDeniedHandler,
-                                                   AuthenticationEntryPoint problemAuthenticationEntryPoint) throws Exception {
+                                                   AuthenticationEntryPoint problemAuthenticationEntryPoint,
+                                                   UserRepository userRepository) throws Exception {
+        ActiveAccountFilter activeAccountFilter =
+                new ActiveAccountFilter(userRepository, problemAuthenticationEntryPoint);
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        .ignoringRequestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/logout"))
+                        .ignoringRequestMatchers("/api/v1/auth/login", "/api/v1/auth/logout"))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/identifier-types").permitAll()
                         .anyRequest().authenticated()
@@ -126,7 +131,10 @@ public class SecurityConfig {
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .addFilterBefore(securityFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+                // After the resource server authenticates the JWT: drop sessions whose
+                // account was deleted or disabled since the token was issued.
+                .addFilterAfter(activeAccountFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }

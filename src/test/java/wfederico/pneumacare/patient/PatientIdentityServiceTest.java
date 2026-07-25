@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import wfederico.pneumacare.patient.application.PatientIdentityService;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.patient.domain.BedStatus;
 import wfederico.pneumacare.patient.domain.ClinicalStatus;
 import wfederico.pneumacare.patient.infrastructure.persistence.IcuBedJpaEntity;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -56,7 +58,6 @@ import static org.mockito.Mockito.when;
  *   <li>ICU not found throws 404</li>
  *   <li>Bed not found in ICU throws 400</li>
  *   <li>Bed is OCCUPIED throws 400</li>
- *   <li>Bed is MAINTENANCE throws 400</li>
  *   <li>Unknown identifier type ID throws 400</li>
  *   <li>findById — found path returns full response</li>
  *   <li>findById — not-found throws 404</li>
@@ -70,6 +71,7 @@ class PatientIdentityServiceTest {
     @Mock private PatientRepository patientRepository;
     @Mock private IcuRepository icuRepository;
     @Mock private IcuBedRepository icuBedRepository;
+    @Mock private CurrentIcuPort currentIcuPort;
 
     @InjectMocks
     private PatientIdentityService service;
@@ -92,6 +94,9 @@ class PatientIdentityServiceTest {
 
     @BeforeEach
     void setUp() {
+        // The service resolves the ICU from the session, not the request.
+        lenient().when(currentIcuPort.currentIcuId()).thenReturn(ICU_ID);
+
         dniType       = buildType(1, "DNI",       "Documento Nacional de Identidad");
         pasaporteType = buildType(5, "Pasaporte", "Pasaporte");
 
@@ -229,20 +234,6 @@ class PatientIdentityServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
-    @Test
-    @DisplayName("create — bed in MAINTENANCE — throws 400 Bad Request")
-    void create_bedInMaintenance_throwsBadRequest() {
-        IcuBedJpaEntity maintenanceBed = IcuBedJpaEntity.builder()
-                .id(BED_ID).icu(icu).bedNumber("BED-003").status(BedStatus.MAINTENANCE).build();
-        when(icuRepository.findById(ICU_ID)).thenReturn(Optional.of(icu));
-        when(icuBedRepository.findByIdAndIcu_Id(BED_ID, ICU_ID)).thenReturn(Optional.of(maintenanceBed));
-
-        assertThatThrownBy(() -> service.create(requestWith(new PatientIdentifierRequest(1, "35123456"))))
-                .isInstanceOf(BusinessLayerException.class)
-                .extracting(e -> ((BusinessLayerException) e).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
     // ── create() — identifier guard failures ─────────────────────────────────
 
     @Test
@@ -297,7 +288,7 @@ class PatientIdentityServiceTest {
     }
 
     private CreatePatientRequest requestWith(PatientIdentifierRequest identifier) {
-        return new CreatePatientRequest(FIRST_NAME, LAST_NAME, BIRTH_DATE, identifier, ICU_ID, BED_ID);
+        return new CreatePatientRequest(FIRST_NAME, LAST_NAME, BIRTH_DATE, identifier, BED_ID);
     }
 
     private PatientIdentityJpaEntity buildIdentityEntity(UUID id,

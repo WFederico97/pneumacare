@@ -1,0 +1,57 @@
+# =============================================================================
+# Additive overlay for the prod stack: frontend SPA + Grafana (otel-lgtm).
+#
+#   docker compose -p pneumacare-prod \
+#     -f compose.prod.yaml -f compose.prod.observability.yaml \
+#     --env-file .env.prod up --build -d
+#
+# compose.prod.yaml stays the minimal app+db+redis deployment shape; this file
+# layers on the frontend (nginx reverse-proxy to `app`) and the observability
+# backend, and points the app's OTLP exporter at Grafana so metrics/traces/logs
+# stop being dropped at localhost:4318.
+# =============================================================================
+services:
+  app:
+    environment:
+      # Send OTLP to the Grafana otel-lgtm collector on the compose network
+      # (was defaulting to localhost:4318 inside the app container = nowhere).
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-lgtm:4318
+    depends_on:
+      grafana-lgtm:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ../pneumacare-frontend
+    image: pneumacare-frontend:prod
+    container_name: pneumacare-frontend-prod
+    environment:
+      # `app` is the backend service on this compose network (listens on 8080).
+      BACKEND_HOST: app
+      BACKEND_PORT: 8080
+      # Same-origin: the SPA calls /api on its own origin (nginx proxies to app).
+      OAUTH2_ISSUER_URI: http://localhost:${FRONTEND_PORT:-4200}
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana-lgtm:
+    image: grafana/otel-lgtm:0.9.1
+    container_name: pneumacare-grafana-prod
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_PATHS_PROVISIONING: /otel-lgtm/grafana/conf/provisioning
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./grafana/provisioning-dashboards.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards/custom
+      - ./grafana/provisioning/datasources:/otel-lgtm/grafana/conf/provisioning/datasources
+    restart: unless-stopped

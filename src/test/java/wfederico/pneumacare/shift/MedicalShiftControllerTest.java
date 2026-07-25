@@ -19,7 +19,6 @@ import wfederico.pneumacare.shared.security.SecurityConfig;
 import wfederico.pneumacare.shift.application.MedicalShiftService;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
 import wfederico.pneumacare.shift.web.MedicalShiftController;
-import wfederico.pneumacare.shift.web.dto.CreateShiftRequest;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
 
 import java.time.OffsetDateTime;
@@ -87,13 +86,9 @@ class MedicalShiftControllerTest {
     @Test
     @DisplayName("openShift_validRequest_returns201WithLocation (AC1)")
     void openShift_validRequest_returns201WithLocation() throws Exception {
-        when(service.open(any(CreateShiftRequest.class))).thenReturn(openResponse());
+        when(service.open()).thenReturn(openResponse());
 
-        String body = """
-                { "icuId": "%s" }
-                """.formatted(ICU_ID);
-
-        mockMvc.perform(post(URL).contentType(APPLICATION_JSON).content(body))
+        mockMvc.perform(post(URL))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", URL + "/" + SHIFT_ID))
                 .andExpect(jsonPath("$.status").value(201))
@@ -104,21 +99,12 @@ class MedicalShiftControllerTest {
     }
 
     @Test
-    @DisplayName("openShift_missingIcuId_returns400")
-    void openShift_missingIcuId_returns400() throws Exception {
-        mockMvc.perform(post(URL).contentType(APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
-    }
-
-    @Test
     @DisplayName("openShift_duplicateOpen_returns409 (AC2)")
     void openShift_duplicateOpen_returns409() throws Exception {
-        when(service.open(any(CreateShiftRequest.class)))
+        when(service.open())
                 .thenThrow(new BusinessLayerException("Ya existe un turno abierto para esta UCI", CONFLICT));
 
-        mockMvc.perform(post(URL).contentType(APPLICATION_JSON)
-                        .content("{ \"icuId\": \"" + ICU_ID + "\" }"))
+        mockMvc.perform(post(URL))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
     }
@@ -126,11 +112,10 @@ class MedicalShiftControllerTest {
     @Test
     @DisplayName("openShift_unknownIcu_returns422 (AC3)")
     void openShift_unknownIcu_returns422() throws Exception {
-        when(service.open(any(CreateShiftRequest.class)))
+        when(service.open())
                 .thenThrow(new BusinessLayerException("No existe la UCI con id: " + ICU_ID, UNPROCESSABLE_ENTITY));
 
-        mockMvc.perform(post(URL).contentType(APPLICATION_JSON)
-                        .content("{ \"icuId\": \"" + ICU_ID + "\" }"))
+        mockMvc.perform(post(URL))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.status").value(422));
     }

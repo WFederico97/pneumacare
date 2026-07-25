@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1
+# =============================================================================
+# Production image — PneumaCare backend (Spring Boot 4.0, Java 17).
+#
+# Defaults to the `prod` Spring profile: OAuth2 JWT resource server enabled,
+# Flyway migrations run on boot, and JPA ddl-auto=validate.
+#
+# Required runtime environment (supply via secrets manager / `docker run -e` /
+# compose `env_file` — NEVER bake these into the image):
+#   AES_SECRET_KEY                  key for PII field encryption (no default)
+#   DB_HOST / DB_PORT / DB_NAME     PostgreSQL connection
+#   DB_USER / DB_PASSWORD           PostgreSQL credentials
+#   REDIS_HOST / REDIS_PORT         Redis connection
+#   PNMC_JWT_SECRET                 >= 256-bit signing secret (self-issued JWT)
+#   PNMC_BOOTSTRAP_ADMIN_PASSWORD   initial admin password (bootstrap seeder)
+#   CORS_ALLOWED_ORIGINS            comma-separated allowed origins
+# Optional: BOOTSTRAP_ADMIN_USERNAME, KAFKA_ENABLED, OTEL_EXPORTER_OTLP_ENDPOINT
+#
+# Build:  docker build -f Dockerfile.prod -t pneumacare-backend:prod .
+# =============================================================================
+
+# ---- Build stage -----------------------------------------------------------
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /build
+
+# Resolve dependencies first so this layer is cached until pom.xml changes.
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+
+# Compile and package (tests run in CI, not in the image build).
+COPY src ./src
+RUN mvn -B -q clean package -DskipTests
+
+# ---- Runtime stage ---------------------------------------------------------
+FROM eclipse-temurin:17-jre AS runtime
+WORKDIR /app
+
+LABEL org.opencontainers.image.source="https://github.com/WFederico97/pneumacare" \
+      org.opencontainers.image.description="PneumaCare backend — production image" \
+      org.opencontainers.image.licenses="MIT"
+
+# Run as an unprivileged user.
+RUN addgroup --system --gid 1001 pneumacare \
+ && adduser --system --uid 1001 --gid 1001 --no-create-home pneumacare
+
+COPY --from=build --chown=pneumacare:pneumacare /build/target/*.jar app.jar
+
+USER pneumacare
+
+# Safe production defaults; overridable at runtime.
+ENV SPRING_PROFILES_ACTIVE=prod \
+    JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
+EXPOSE 8080
+
+# Liveness/readiness for the orchestrator; matches the compose dev healthcheck.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
+
+# `exec` so the JVM is PID 1 and receives SIGTERM for graceful shutdown.
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

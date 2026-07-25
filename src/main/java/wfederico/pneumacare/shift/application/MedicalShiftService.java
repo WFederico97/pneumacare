@@ -9,15 +9,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import wfederico.pneumacare.shared.exception.BusinessLayerException;
+import wfederico.pneumacare.shared.security.CurrentIcuPort;
 import wfederico.pneumacare.shared.security.CurrentUserPort;
 import wfederico.pneumacare.shift.domain.ShiftStatus;
+import wfederico.pneumacare.shift.application.ShiftActivityPort.ShiftActivity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftJpaEntity;
 import wfederico.pneumacare.shift.infrastructure.persistence.MedicalShiftRepository;
-import wfederico.pneumacare.shift.web.dto.CreateShiftRequest;
+import wfederico.pneumacare.shift.infrastructure.persistence.ShiftHandoverRepository;
 import wfederico.pneumacare.shift.web.dto.ShiftResponse;
+import wfederico.pneumacare.shift.web.dto.ShiftSummaryResponse;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,9 +43,11 @@ import static wfederico.pneumacare.shared.constants.ExceptionMessageConstants.SH
 @RequiredArgsConstructor
 public class MedicalShiftService {
     private final MedicalShiftRepository shiftRepository;
+    private final ShiftHandoverRepository handoverRepository;
     private final IcuExistencePort icuExistencePort;
     private final CurrentUserPort currentUserPort;
     private final CurrentIcuPort currentIcuPort;
+    private final ShiftActivityPort shiftActivityPort;
 
     /**
      * Returns the active (OPEN) shift for the current context's ICU, if any.
@@ -52,7 +60,49 @@ public class MedicalShiftService {
     }
 
     /**
-     * Opens a new shift for an ICU.
+     * The session ICU's shift history, newest first, each row carrying its
+     * duration and the clinical activity recorded during it.
+     *
+     * <p>Scoped to the session ICU for the same reason {@link #close(UUID)} is:
+     * a chief of guard has no business reading another unit's shift log.
+     */
+    @Transactional(readOnly = true)
+    public List<ShiftSummaryResponse> history() {
+        UUID icuId = currentIcuPort.currentIcuId();
+        List<MedicalShiftJpaEntity> shifts = shiftRepository.findByIcuIdOrderByStartTimeDesc(icuId);
+
+        List<UUID> shiftIds = shifts.stream().map(MedicalShiftJpaEntity::getId).toList();
+        Map<UUID, ShiftActivity> activity = shiftActivityPort.countByShiftIds(shiftIds);
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        return shifts.stream()
+                .map(shift -> {
+                    // An OPEN shift is still running, so measure it up to now.
+                    OffsetDateTime end = shift.getEndTime() == null ? now : shift.getEndTime();
+                    ShiftActivity counts = activity.getOrDefault(shift.getId(), ShiftActivity.NONE);
+                    return new ShiftSummaryResponse(
+                            shift.getId(),
+                            shift.getIcuId(),
+                            shift.getChiefUserId(),
+                            shift.getStatus(),
+                            shift.getStartTime(),
+                            shift.getEndTime(),
+                            Duration.between(shift.getStartTime(), end).toMinutes(),
+                            handoverRepository.countByShiftId(shift.getId()),
+                            counts.evaluations(),
+                            counts.airwayEvents(),
+                            counts.sbts());
+                })
+                .toList();
+    }
+
+    /**
+     * Opens a new shift for the current session's ICU.
+     *
+     * <p>The ICU is derived server-side from the authenticated principal via
+     * {@link CurrentIcuPort} — the same source {@link #getActiveShift()} reads —
+     * so open and active-lookup are always scoped to the same ICU. The client
+     * does not supply it.
      *
      * <p>{@link Observed} records a {@code shift.open} timer/span; only the ICU UUID
      * (non-PII) is added as a span attribute.
@@ -60,8 +110,8 @@ public class MedicalShiftService {
     @Observed(name = "shift.open", contextualName = "open-shift",
             lowCardinalityKeyValues = {"endpoint", "shift-open"})
     @Transactional
-    public ShiftResponse open(CreateShiftRequest shiftRequest){
-        UUID icuId = shiftRequest.icuId();
+    public ShiftResponse open(){
+        UUID icuId = currentIcuPort.currentIcuId();
         Span.current().setAttribute("shift.icu_id", String.valueOf(icuId));
 
         if (!icuExistencePort.exists(icuId)){
@@ -89,7 +139,14 @@ public class MedicalShiftService {
     }
 
     /**
-     * Closes an OPEN shift.
+     * Closes an OPEN shift belonging to the caller's session ICU.
+     *
+     * <p>The shift must be in the ICU derived from the authenticated principal
+     * ({@link CurrentIcuPort}) — the same source {@link #open()} uses. Without
+     * that check a chief of guard could close another ICU's shift simply by
+     * knowing its UUID. A shift in a different ICU is reported as
+     * {@code 404}, not {@code 403}, so the endpoint does not confirm the
+     * existence of shifts the caller may not act on.
      *
      * <p>{@link Observed} records a {@code shift.close} timer/span; only the shift UUID
      * (non-PII) is added as a span attribute.
@@ -97,12 +154,20 @@ public class MedicalShiftService {
     @Observed(name = "shift.close", contextualName = "close-shift",
             lowCardinalityKeyValues = {"endpoint", "shift-close"})
     @Transactional
-    public ShiftResponse close(UUID icuId){
-        Span.current().setAttribute("shift.id", String.valueOf(icuId));
-        MedicalShiftJpaEntity shift = shiftRepository.findById(icuId)
+    public ShiftResponse close(UUID shiftId){
+        Span.current().setAttribute("shift.id", String.valueOf(shiftId));
+        MedicalShiftJpaEntity shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new BusinessLayerException(
                         SHIFT_NOT_FOUND,HttpStatus.NOT_FOUND
                 ));
+
+        UUID sessionIcuId = currentIcuPort.currentIcuId();
+        if (!shift.getIcuId().equals(sessionIcuId)) {
+            log.warn("Cross-ICU shift close rejected: shiftId={}, shiftIcu={}, sessionIcu={}",
+                    shiftId, shift.getIcuId(), sessionIcuId);
+            throw new BusinessLayerException(SHIFT_NOT_FOUND, HttpStatus.NOT_FOUND);
+        }
+
         if (shift.getStatus() == ShiftStatus.CLOSED){
             throw new BusinessLayerException(SHIFT_ALREADY_CLOSED, HttpStatus.CONFLICT);
         }
